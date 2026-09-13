@@ -15,7 +15,7 @@ FlowOnRails is a library built to bring Railway Oriented Programming to C# nativ
 ## Installation
 
 ```bash
-dotnet add package FlowOnRails --prerelease
+dotnet add package FlowOnRails
 ```
 
 ## Usage
