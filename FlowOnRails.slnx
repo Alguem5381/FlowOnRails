@@ -13,6 +13,10 @@
     <File Path="LICENSE" />
     <File Path="README.md" />
   </Folder>
+  <Folder Name="/Solution Items/Workflows/">
+    <File Path=".github\workflows\cd.yml" />
+    <File Path=".github\workflows\ci.yml" />
+  </Folder>
 
   <Folder Name="/src/">
     <Project Path="src/FlowOnRails/FlowOnRails.csproj" />
