@@ -169,6 +169,37 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     }
 
     /// <summary>
+    /// Executes a fallible operation on success, preserving the original value if it succeeds.
+    /// </summary>
+    /// <param name="check">The operation to check using the current value.</param>
+    /// <returns>The original rail on success, or a failed rail containing the checked operation's error.</returns>
+    /// <remarks>Existing failures skip the callback. Uninitialized rails throw InvalidOperationException; callback exceptions propagate.</remarks>
+    public RailFor<TValue> Check(Func<TValue, Rail> check)
+    {
+        if (IsFailure)
+            return this;
+
+        var next = check(Value);
+        return next.IsFailure ? Fail(next.Error!) : this;
+    }
+
+    /// <summary>
+    /// Executes a fallible operation on success, discarding its value and preserving the original value if it succeeds.
+    /// </summary>
+    /// <typeparam name="TChecked">The type of the discarded value.</typeparam>
+    /// <param name="check">The operation to check using the current value.</param>
+    /// <returns>The original rail on success, or a failed rail containing the checked operation's error.</returns>
+    /// <remarks>Existing failures skip the callback. Uninitialized rails throw InvalidOperationException; callback exceptions propagate.</remarks>
+    public RailFor<TValue> Check<TChecked>(Func<TValue, RailFor<TChecked>> check) where TChecked : notnull
+    {
+        if (IsFailure)
+            return this;
+
+        var next = check(Value);
+        return next.IsFailure ? Fail(next.Error!) : this;
+    }
+
+    /// <summary>
     /// Maps the error of a failed rail to another error synchronously.
     /// </summary>
     public RailFor<TValue> MapError(Func<Error, Error> errorMapper) =>

@@ -145,6 +145,23 @@ public readonly partial struct Rail
     }
 
     /// <summary>
+    /// Executes a fallible operation on success and continues without a value if it succeeds.
+    /// </summary>
+    /// <param name="check">The operation to check.</param>
+    /// <returns>A successful rail or a failed rail containing the first error encountered.</returns>
+    /// <remarks>Existing failures skip the callback. Uninitialized rails throw InvalidOperationException; callback exceptions propagate.</remarks>
+    public Rail Check(Func<Rail> check) => Bind(check);
+
+    /// <summary>
+    /// Executes a fallible operation on success, discarding its value if it succeeds.
+    /// </summary>
+    /// <typeparam name="TChecked">The type of the discarded value.</typeparam>
+    /// <param name="check">The operation to check.</param>
+    /// <returns>A successful rail or a failed rail containing the first error encountered.</returns>
+    /// <remarks>Existing failures skip the callback. Uninitialized rails throw InvalidOperationException; callback exceptions propagate.</remarks>
+    public Rail Check<TChecked>(Func<RailFor<TChecked>> check) where TChecked : notnull => Bind(check);
+
+    /// <summary>
     /// Maps a successful rail to a rail with a value.
     /// </summary>
     public RailFor<TNext> Map<TNext>(Func<TNext> map) where TNext : notnull =>
