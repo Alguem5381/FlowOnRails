@@ -47,6 +47,23 @@ public RailFor<User> GetUser(int id)
 }
 ```
 
+### Checking a fallible operation while keeping the value
+
+`Check` runs another operation only when the current rail succeeds. If the checked operation succeeds, the original value continues through the pipeline; any value produced by that operation is discarded. If it fails, its error stops the pipeline.
+
+```csharp
+public RailFor<User> PrepareUser(int id)
+{
+    return GetUser(id)
+        .Check(user => ValidatePermissions(user)) // Returns Rail
+        .Check(user => LoadPreferences(user));    // Returns RailFor<Preferences>; value is discarded
+}
+```
+
+The callbacks can return `Rail` or `RailFor<T>`. `Check` is also available on an untyped `Rail`, which continues without a value. Use `Bind` when the next operation's value should replace the current value, `Ensure` for a predicate with a supplied error, and `Tap` for an action without a rail result.
+
+`Check` currently belongs to the synchronous core. Callback exceptions propagate, and uninitialized callback results are rejected.
+
 ### Using LINQ
 
 You can use LINQ to chain logic. If any step fails, the flow is interrupted and the error is returned immediately:
@@ -135,7 +152,7 @@ Task and ValueTask extensions provide `RecoverAsync` for typed replacement value
 - Construct results through `Rail.Ok(...)` and `Rail.Fail<T>(error)`. The old public `RailFor<T>.Ok` and `RailFor<T>.Fail` factories are no longer public.
 - `IRail` and its explicit `TryGetError` method have been removed. Use `IsFailure`, `TryUnwrap` or `Match` on the concrete rail type.
 - Calls to the previous `Recover` / `RecoverAsync` that return a rail should use `RecoverWith` / `RecoverWithAsync`.
-- Observing or operating on `default(Rail)` or `default(RailFor<T>)` throws `InvalidOperationException`. Construct a successful or failed result explicitly. `Bind` and `RecoverWith` also reject an uninitialized rail returned by a callback.
+- Observing or operating on `default(Rail)` or `default(RailFor<T>)` throws `InvalidOperationException`. Construct a successful or failed result explicitly. `Bind`, `Check` and `RecoverWith` also reject an uninitialized rail returned by a callback.
 - Factories reject null values and null errors. Callback exceptions and cancellation propagate rather than becoming domain errors.
 
 See [operation semantics](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/operation-semantics.md) for the current contract. Semantic success records are deferred; the rationale and archived implementation are described in the [design note](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/design/semantic-success.md). Domain result variants belong in the application's value types.

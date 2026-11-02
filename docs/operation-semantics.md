@@ -15,7 +15,7 @@ A valid rail is either successful or failed:
 
 `Rail.Ok()`, `Rail.Ok(value)`, `Rail.Fail(error)` and `Rail.Fail<T>(error)` are the public factory facade. Task factories construct the same states inside completed tasks. Implicit conversions from values and errors obey the same rules. Factories reject null values and null errors.
 
-Observing or operating on `default(Rail)` or `default(RailFor<T>)` throws `InvalidOperationException`. This is a programming error and cannot be recovered as a domain failure. `Bind` and `RecoverWith` also reject uninitialized callback results before returning them.
+Observing or operating on `default(Rail)` or `default(RailFor<T>)` throws `InvalidOperationException`. This is a programming error and cannot be recovered as a domain failure. `Bind`, `Check` and `RecoverWith` also reject uninitialized callback results before returning them.
 
 ## Observation
 
@@ -33,6 +33,7 @@ There is no `Outcome` hierarchy or semantic success object in this development l
 |---|---|---|
 | `Map` | Invoke once and wrap the returned non-null value | Skip callback; preserve error |
 | `Bind` | Invoke once and return its valid rail, including a new failure | Skip callback; preserve error |
+| `Check` | Invoke once; preserve source on success, discard callback value, or return its original error on failure | Skip callback; preserve source |
 | `Ensure` | Invoke predicate once; preserve source when true, fail with supplied error when false | Skip predicate; preserve source |
 | `Tap` | Invoke action once; preserve source | Skip action; preserve source |
 | `TapIf(bool, action)` | Invoke action once only when condition is true | Skip action; preserve source |
@@ -42,6 +43,10 @@ There is no `Outcome` hierarchy or semantic success object in this development l
 | `RecoverWith` | Skip callback; preserve source | Invoke once and return its valid fallback rail, which may fail |
 
 `Bind` supports both transitions between rails with and without values. Typed-to-untyped conversion removes the value and preserves the control state and error.
+
+`Check` accepts a callback returning either `Rail` or `RailFor<TChecked>`. Typed sources pass their value to the callback and retain that same value on success. Untyped sources pass no value and continue without one. `Check` is currently synchronous; it does not introduce Task or ValueTask overloads.
+
+Without semantic successes, `BindKeepValue` would duplicate `Check`, and `BindKeepSuccess` would duplicate `Bind`. No separate operations with those names are provided. `MapSuccess` does not apply to this model.
 
 The untyped rail has no value-producing `Recover`; use `RecoverWith` with a fallback returning `Rail`. There is no automatic exception handling: callback exceptions propagate. Domain errors model explicit failures.
 

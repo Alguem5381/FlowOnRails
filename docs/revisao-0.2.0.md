@@ -26,7 +26,8 @@ A pendência de composição de sucessos ricos em `Combine` deixa de se aplicar.
 
 ## Antes da publicação
 
-- [ ] Escolher o conjunto mínimo de novas operações a partir de usos reais, sem depender da matriz de sucessos adiada.
+- [x] Implementar `Check` no núcleo síncrono para executar uma operação falível, preservar o valor anterior em sucesso e propagar o erro em falha. `BindKeepValue` seria redundante sem sucessos semânticos.
+- [ ] Avaliar novas operações e versões assíncronas a partir de usos reais.
 - [ ] Concluir revisão dos comentários XML da API.
 - [ ] Confirmar execução da integração contínua para a versão que será publicada.
 - [ ] Publicar a versão somente após revisão do pacote e da documentação final.
@@ -40,3 +41,7 @@ Em 02/11/2026, a suíte em Release aprovou **506 cenários**: 76 no projeto orig
 O pacote local `FlowOnRails.0.2.0.nupkg` também foi gerado e executado em um consumidor independente, sem referência ao projeto. Foram verificados tipos de domínio em `TValue`, identidade do erro, lambdas Task sem casts, encadeamento ValueTask, recuperação, rejeição de `default` e ausência dos tipos `Success` e `Outcome` no pacote. Isso não representa publicação no NuGet.
 
 A [issue #2](https://github.com/Alguem5381/FlowOnRails/issues/2) foi fechada como `not_planned`, com a justificativa do adiamento e referência à branch de arquivo publicada.
+
+## Adição de Check
+
+Ainda em 02/11/2026, foram adicionadas quatro sobrecargas síncronas de `Check`, cruzando origens e callbacks com ou sem valor. A validação passou com **547 cenários** (76 no projeto original e 471 no consumidor), incluindo 41 novos cenários de preservação do valor, identidade do erro, interrupção, estado não inicializado, exceções e inferência de tipos com method groups.
