@@ -8,6 +8,6 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// <param name="rail">The typed rail to convert.</param>
     public static implicit operator Rail(RailFor<TValue> rail) =>
         rail.IsSuccess
-            ? Rail.Ok()
+            ? Rail.CreateSuccess(rail.SemanticSuccess)
             : Rail.Fail(rail.Error!);
 }

@@ -23,16 +23,43 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// </example>
     public bool TryUnwrap([NotNullWhen(true)] out TValue? value, [NotNullWhen(false)] out Error? error)
     {
-        value = Value;
-        error = Error!;
-        return IsSuccess;
+        var isSuccess = IsSuccess;
+
+        value = isSuccess ? Value : default;
+        error = Error;
+
+        return isSuccess;
+    }
+
+    /// <summary>
+    /// Attempts to unwrap the value, error, and semantic success from the rail.
+    /// </summary>
+    /// <remarks>
+    /// The neutral success is materialized only when this overload observes a successful rail.
+    /// </remarks>
+    public bool TryUnwrap(
+        [NotNullWhen(true)] out TValue? value,
+        [NotNullWhen(false)] out Error? error,
+        [NotNullWhen(true)] out Success? success)
+    {
+        var isSuccess = IsSuccess;
+
+        value = isSuccess ? Value : default;
+        error = Error;
+        success = isSuccess ? Success.Materialize(SemanticSuccess) : null;
+
+        return isSuccess;
     }
 
     /// <summary>
     /// Ensures that the specified predicate is true. If it is false, returns a failed rail with the provided error.
     /// </summary>
     public RailFor<TValue> Ensure(Func<TValue, bool> predicate, Error error) =>
-        IsFailure ? this : predicate(Value) ? this : Fail(error);
+        IsFailure
+            ? this
+            : predicate(Value)
+                ? this
+                : Fail(error);
 
     /// <summary>
     /// Executes the given action if the rail is successful, passing the value.
@@ -70,12 +97,20 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     }
 
     /// <summary>
-    /// Recovers from a failed rail by executing the fallback function.
+    /// Recovers from a failed rail by producing a value with the neutral semantic success.
     /// </summary>
-    public RailFor<TValue> Recover(Func<Error, RailFor<TValue>> fallback)
-    {
-        return IsSuccess ? this : fallback(Error!);
-    }
+    public RailFor<TValue> Recover(Func<Error, TValue> recover) =>
+        IsSuccess
+            ? this
+            : CreateSuccess(recover(Error!), success: null);
+
+    /// <summary>
+    /// Replaces a failed rail with the rail returned by the fallback function.
+    /// </summary>
+    public RailFor<TValue> RecoverWith(Func<Error, RailFor<TValue>> fallback) =>
+        IsSuccess
+            ? this
+            : fallback(Error!);
 
     /// <summary>
     /// Matches the rail and returns a value based on success or failure.
@@ -92,10 +127,19 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// );
     /// </code>
     /// </example>
-    public TNext Match<TNext>(Func<TValue, TNext> onSuccess, Func<Error, TNext> onFailure) where TNext : notnull
-    {
-        return IsSuccess ? onSuccess(Value) : onFailure(Error!);
-    }
+    public TNext Match<TNext>(Func<TValue, TNext> onSuccess, Func<Error, TNext> onFailure) where TNext : notnull =>
+        IsSuccess
+            ? onSuccess(Value)
+            : onFailure(Error!);
+
+    /// <summary>
+    /// Matches the rail and exposes its value with the semantic success, or its error.
+    /// </summary>
+    public TNext Match<TNext>(Func<TValue, Success, TNext> onSuccess, Func<Error, TNext> onFailure)
+        where TNext : notnull =>
+        IsSuccess
+            ? onSuccess(Value, Success.Materialize(SemanticSuccess))
+            : onFailure(Error!);
 
     /// <summary>
     /// Maps the rail to another rail using the given function if successful.
@@ -109,7 +153,9 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// </code>
     /// </example>
     public RailFor<TResult> Map<TResult>(Func<TValue, TResult> map) where TResult : notnull =>
-        IsFailure ? RailFor<TResult>.Fail(Error!) : RailFor<TResult>.Ok(map(Value));
+        IsFailure
+            ? RailFor<TResult>.Fail(Error!)
+            : RailFor<TResult>.CreateSuccess(map(Value), SemanticSuccess);
 
     /// <summary>
     /// Binds the rail to another rail using the given function if successful.
@@ -128,7 +174,12 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
         if (IsFailure)
             return RailFor<TResult>.Fail(Error!);
 
-        return bind(Value);
+        var next = bind(Value);
+        return next.IsFailure
+            ? next
+            : RailFor<TResult>.CreateSuccess(
+                next.Value,
+                SuccessComposition.Combine(SemanticSuccess, next.SemanticSuccess));
     }
 
     /// <summary>
@@ -139,12 +190,17 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
         if (IsFailure)
             return Rail.Fail(Error!);
 
-        return bind(Value);
+        var next = bind(Value);
+        return next.IsFailure
+            ? next
+            : Rail.CreateSuccess(SuccessComposition.Combine(SemanticSuccess, next.SemanticSuccess));
     }
 
     /// <summary>
     /// Maps the error of a failed rail to another error synchronously.
     /// </summary>
     public RailFor<TValue> MapError(Func<Error, Error> errorMapper) =>
-        IsSuccess ? this : Fail(errorMapper(Error!));
+        IsSuccess
+            ? this
+            : Fail(errorMapper(Error!));
 }

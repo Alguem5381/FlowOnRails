@@ -17,11 +17,27 @@ public readonly partial struct Rail
     /// }
     /// </code>
     /// </example>
-    public bool TryUnwrap([NotNullWhen(false)] out Error
-        ? error)
+    public bool TryUnwrap([NotNullWhen(false)] out Error? error)
     {
+        var isSuccess = IsSuccess;
         error = Error!;
-        return IsSuccess;
+        return isSuccess;
+    }
+
+    /// <summary>
+    /// Attempts to unwrap the error or semantic success from the rail.
+    /// </summary>
+    /// <remarks>
+    /// The neutral success is materialized only when this overload observes a successful rail.
+    /// </remarks>
+    public bool TryUnwrap(
+        [NotNullWhen(false)] out Error? error,
+        [NotNullWhen(true)] out Success? success)
+    {
+        var isSuccess = IsSuccess;
+        error = Error;
+        success = isSuccess ? Success.Materialize(SemanticSuccess) : null;
+        return isSuccess;
     }
 
     /// <summary>
@@ -65,15 +81,23 @@ public readonly partial struct Rail
     }
 
     /// <summary>
-    /// Recovers from a failed rail by executing the fallback function.
+    /// Recovers from a failed rail by producing a semantic success.
     /// </summary>
     /// <example>
     /// <code>
     /// var rail = ExecuteOperation()
-    ///     .Recover(error => Rail.Ok()); // Fallback to success
+    ///     .Recover(error => new OperationRecovered(error));
     /// </code>
     /// </example>
-    public Rail Recover(Func<Error, Rail> fallback) =>
+    public Rail Recover(Func<Error, Success> recover) =>
+        IsSuccess
+            ? this
+            : Succeed(recover(Error!));
+
+    /// <summary>
+    /// Replaces a failed rail with the rail returned by the fallback function.
+    /// </summary>
+    public Rail RecoverWith(Func<Error, Rail> fallback) =>
         IsSuccess
             ? this
             : fallback(Error!);
@@ -89,10 +113,16 @@ public readonly partial struct Rail
     ///     .Bind(() => SaveUserToDatabase());
     /// </code>
     /// </example>
-    public Rail Bind(Func<Rail> bind) =>
-        IsSuccess
-            ? bind()
-            : new Rail(isSuccess: false, Error);
+    public Rail Bind(Func<Rail> bind)
+    {
+        if (IsFailure)
+            return this;
+
+        var next = bind();
+        return next.IsFailure
+            ? next
+            : CreateSuccess(SuccessComposition.Combine(SemanticSuccess, next.SemanticSuccess));
+    }
 
 
     /// <summary>
@@ -118,31 +148,45 @@ public readonly partial struct Rail
     /// <code>
     /// string message = rail.Match(
     ///     onSuccess: () => "Operation was successful!",
-    ///     onFailure: error => $"Operation failed: {error.Message}"
+    ///     onFailure: error => $"Operation failed: {error}"
     /// );
     /// </code>
     /// </example>
-    public TNext Match<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure)
-    {
-        return IsSuccess
+    public TNext Match<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure) =>
+        IsSuccess
             ? onSuccess()
             : onFailure(Error!);
-    }
+
+    /// <summary>
+    /// Matches the rail and exposes its semantic success or error.
+    /// </summary>
+    public TNext Match<TNext>(Func<Success, TNext> onSuccess, Func<Error, TNext> onFailure) =>
+        IsSuccess
+            ? onSuccess(Success.Materialize(SemanticSuccess))
+            : onFailure(Error!);
 
     /// <summary>
     /// Binds the rail to another rail that returns a value using the given function if successful.
     /// </summary>
-    public RailFor<TNext> Bind<TNext>(Func<RailFor<TNext>> bind) where TNext : notnull =>
-        IsSuccess
-            ? bind()
-            : RailFor<TNext>.Fail(Error!);
+    public RailFor<TNext> Bind<TNext>(Func<RailFor<TNext>> bind) where TNext : notnull
+    {
+        if (IsFailure)
+            return RailFor<TNext>.Fail(Error!);
+
+        var next = bind();
+        return next.IsFailure
+            ? next
+            : RailFor<TNext>.CreateSuccess(
+                next.Value,
+                SuccessComposition.Combine(SemanticSuccess, next.SemanticSuccess));
+    }
 
     /// <summary>
     /// Maps a successful rail to a rail with a value.
     /// </summary>
     public RailFor<TNext> Map<TNext>(Func<TNext> map) where TNext : notnull =>
         IsSuccess
-            ? RailFor<TNext>.Ok(map())
+            ? RailFor<TNext>.CreateSuccess(map(), SemanticSuccess)
             : RailFor<TNext>.Fail(Error!);
 
     /// <summary>

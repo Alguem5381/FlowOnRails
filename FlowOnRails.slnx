@@ -18,11 +18,16 @@
     <File Path=".github\workflows\ci.yml" />
   </Folder>
 
+  <Folder Name="/Solution Items/Docs/">
+    <File Path="docs\operation-semantics.md" />
+  </Folder>
+
   <Folder Name="/src/">
     <Project Path="src/FlowOnRails/FlowOnRails.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
     <Project Path="tests/FlowOnRails.Tests/FlowOnRails.Tests.csproj" />
+    <Project Path="tests/FlowOnRails.PublicApi.Tests/FlowOnRails.PublicApi.Tests.csproj" />
   </Folder>
 </Solution>

@@ -9,7 +9,7 @@ public class LinqExtensionsTests
     [Fact]
     public void Combine_AllSuccess_ReturnsSuccessWithAllValues()
     {
-        var results = new[] { RailFor<int>.Ok(1), RailFor<int>.Ok(2), RailFor<int>.Ok(3) };
+        var results = new[] { Rail.Ok(1), Rail.Ok(2), Rail.Ok(3) };
 
         var combined = results.Combine();
 
@@ -23,7 +23,7 @@ public class LinqExtensionsTests
         var error = new TestError("Failure");
         var results = new[]
         {
-            RailFor<int>.Ok(1), RailFor<int>.Fail(error), RailFor<int>.Fail(new TestError("Second failure"))
+            Rail.Ok(1), RailFor<int>.Fail(error), RailFor<int>.Fail(new TestError("Second failure"))
         };
 
         var combined = results.Combine();
@@ -35,7 +35,7 @@ public class LinqExtensionsTests
     [Fact]
     public void SelectOks_FiltersSuccessfulValues()
     {
-        var results = new[] { RailFor<int>.Ok(1), RailFor<int>.Fail(new TestError("Error")), RailFor<int>.Ok(3) };
+        var results = new[] { Rail.Ok(1), RailFor<int>.Fail(new TestError("Error")), Rail.Ok(3) };
 
         var oks = results.SelectOks().ToList();
 
@@ -49,7 +49,7 @@ public class LinqExtensionsTests
     {
         var error1 = new TestError("Error1");
         var error2 = new TestError("Error2");
-        var results = new[] { RailFor<int>.Ok(1), RailFor<int>.Fail(error1), RailFor<int>.Fail(error2) };
+        var results = new[] { Rail.Ok(1), RailFor<int>.Fail(error1), RailFor<int>.Fail(error2) };
 
         var errors = results.SelectErrors().ToList();
 
@@ -62,7 +62,7 @@ public class LinqExtensionsTests
     public void Partition_SeparatesSuccessesAndFailures()
     {
         var error = new TestError("Error");
-        var results = new[] { RailFor<int>.Ok(1), RailFor<int>.Fail(error), RailFor<int>.Ok(3) };
+        var results = new[] { Rail.Ok(1), RailFor<int>.Fail(error), Rail.Ok(3) };
 
         var (oks, errors) = results.Partition();
 
@@ -74,7 +74,7 @@ public class LinqExtensionsTests
     [Fact]
     public void Map_TransformsSuccessfulValues()
     {
-        var results = new[] { RailFor<int>.Ok(1), RailFor<int>.Fail(new TestError("Error")), RailFor<int>.Ok(3) };
+        var results = new[] { Rail.Ok(1), RailFor<int>.Fail(new TestError("Error")), Rail.Ok(3) };
 
         var mapped = results.Map(x => x.ToString()).ToList();
 
@@ -89,9 +89,9 @@ public class LinqExtensionsTests
     [Fact]
     public void Bind_BindsSuccessfulValues()
     {
-        var results = new[] { RailFor<int>.Ok(1), RailFor<int>.Fail(new TestError("Error")), RailFor<int>.Ok(3) };
+        var results = new[] { Rail.Ok(1), RailFor<int>.Fail(new TestError("Error")), Rail.Ok(3) };
 
-        var bound = results.Bind(x => RailFor<string>.Ok(x.ToString())).ToList();
+        var bound = results.Bind(x => Rail.Ok(x.ToString())).ToList();
 
         Assert.Equal(3, bound.Count);
         Assert.True(bound[0].IsSuccess);

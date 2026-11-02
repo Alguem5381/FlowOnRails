@@ -1,28 +1,64 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace FlowOnRails;
 
 /// <summary>
 /// Represents the rail of an operation that does not return a value.
 /// </summary>
-public readonly partial struct Rail : IRail, IEquatable<Rail>
+public readonly partial struct Rail : IEquatable<Rail>
 {
-    /// <inheritdoc/>
-    public bool IsSuccess { get; }
+    private readonly Outcome? _outcome;
 
-    /// <inheritdoc/>
-    public bool IsFailure { get => !IsSuccess; }
+    /// <summary>
+    /// Gets a value indicating whether the operation was successful.
+    /// </summary>
+    public bool IsSuccess
+    {
+        get
+        {
+            RailState.EnsureInitialized(field, _outcome);
+            return field;
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the operation failed.
+    /// </summary>
+    public bool IsFailure => !IsSuccess;
 
     /// <summary>
     /// Gets the error associated with a failed rail. Null if the operation was successful.
     /// </summary>
-    internal Error? Error { get; }
+    internal Error? Error => _outcome as Error;
 
-    private Rail(bool isSuccess, Error? error)
+    /// <summary>
+    /// Gets the explicit semantic success, or null when the neutral success is being used.
+    /// </summary>
+    internal Success? SemanticSuccess => _outcome as Success;
+
+    /// <summary>
+    /// Gets the semantic outcome of the operation.
+    /// </summary>
+    /// <remarks>
+    /// Reading this property materializes the shared neutral success when no rich success was supplied.
+    /// </remarks>
+    public Outcome Outcome
     {
-        IsSuccess = isSuccess;
-        Error = error;
+        get
+        {
+            _ = IsSuccess;
+            return _outcome ?? Success.Neutral;
+        }
     }
+
+    private Rail(bool isSuccess, Outcome? outcome)
+    {
+        RailState.EnsureValid(isSuccess, outcome);
+
+        IsSuccess = isSuccess;
+        _outcome = outcome;
+    }
+
+    internal static Rail CreateSuccess(Success? success) =>
+        new(isSuccess: true, outcome: Success.Normalize(success));
 
     /// <summary>
     /// Creates a successful rail.
@@ -40,7 +76,16 @@ public readonly partial struct Rail : IRail, IEquatable<Rail>
     /// <remarks>
     /// Always extract and check for errors using <c>TryUnwrap</c>.
     /// </remarks>
-    public static Rail Ok() => new(isSuccess: true, error: null);
+    public static Rail Ok() => CreateSuccess(success: null);
+
+    /// <summary>
+    /// Creates a successful rail with the specified semantic success and no value.
+    /// </summary>
+    public static Rail Succeed(Success success)
+    {
+        ArgumentNullException.ThrowIfNull(success);
+        return CreateSuccess(success);
+    }
 
     /// <summary>
     /// Creates a failed rail with the specified error.
@@ -55,14 +100,28 @@ public readonly partial struct Rail : IRail, IEquatable<Rail>
     /// return Rail.Fail(error);
     /// </code>
     /// </example>
-    public static Rail Fail(Error error) => new(isSuccess: false, error: error);
+    public static Rail Fail(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return new Rail(isSuccess: false, outcome: error);
+    }
 
     /// <summary>
     /// Creates a successful rail containing the specified value.
     /// </summary>
     /// <param name="value">The value to wrap in the rail.</param>
     /// <returns>A successful <see cref="RailFor{TValue}"/>.</returns>
-    public static RailFor<TValue> Ok<TValue>(TValue value) where TValue : notnull => RailFor<TValue>.Ok(value);
+    public static RailFor<TValue> Ok<TValue>(TValue value) where TValue : notnull =>
+        RailFor<TValue>.CreateSuccess(value, success: null);
+
+    /// <summary>
+    /// Creates a successful rail containing the specified value and semantic success.
+    /// </summary>
+    public static RailFor<TValue> Ok<TValue>(TValue value, Success success) where TValue : notnull
+    {
+        ArgumentNullException.ThrowIfNull(success);
+        return RailFor<TValue>.CreateSuccess(value, success);
+    }
 
     /// <summary>
     /// Creates a failed rail with the specified error.
@@ -77,10 +136,21 @@ public readonly partial struct Rail : IRail, IEquatable<Rail>
     public static Task<Rail> OkAsync() => Task.FromResult(Ok());
 
     /// <summary>
+    /// Creates a successful rail with the specified semantic success and no value as a Task.
+    /// </summary>
+    public static Task<Rail> SucceedAsync(Success success) => Task.FromResult(Succeed(success));
+
+    /// <summary>
     /// Creates a successful rail containing the specified value as a Task.
     /// </summary>
     public static Task<RailFor<TValue>> OkAsync<TValue>(TValue value) where TValue : notnull =>
         Task.FromResult(Ok(value));
+
+    /// <summary>
+    /// Creates a successful rail containing the specified value and semantic success as a Task.
+    /// </summary>
+    public static Task<RailFor<TValue>> OkAsync<TValue>(TValue value, Success success) where TValue : notnull =>
+        Task.FromResult(Ok(value, success));
 
     /// <summary>
     /// Creates a failed rail with the specified error as a Task.
@@ -99,34 +169,31 @@ public readonly partial struct Rail : IRail, IEquatable<Rail>
     /// <param name="error">The error.</param>
     public static implicit operator Rail(Error error) => Fail(error: error);
 
-    bool IRail.TryGetError([NotNullWhen(true)] out Error? error)
-    {
-        error = Error;
-        return IsFailure;
-    }
-
     /// <summary>
     /// Indicates whether the current rail is equal to another rail.
     /// </summary>
     public bool Equals(Rail other)
     {
-        if (IsSuccess != other.IsSuccess) return false;
-        return IsSuccess ||
-               EqualityComparer<Error?>.Default.Equals(Error, other.Error);
+        var isSuccess = IsSuccess;
+
+        return isSuccess == other.IsSuccess &&
+               EqualityComparer<Outcome?>.Default.Equals(_outcome, other._outcome);
     }
 
     /// <summary>
     /// Indicates whether this instance and a specified object are equal.
     /// </summary>
-    public override bool Equals(object? obj) => obj is Rail other && Equals(other);
+    public override bool Equals(object? obj) =>
+        obj is Rail other && Equals(other);
 
     /// <summary>
     /// Returns the hash code for this instance.
     /// </summary>
-    public override int GetHashCode() =>
-        IsSuccess
-            ? HashCode.Combine(IsSuccess)
-            : HashCode.Combine(IsSuccess, Error);
+    public override int GetHashCode()
+    {
+        var isSuccess = IsSuccess;
+        return HashCode.Combine(isSuccess, _outcome);
+    }
 
     /// <summary>
     /// Compares two rails for equality.
