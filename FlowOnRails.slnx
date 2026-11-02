@@ -24,5 +24,6 @@
 
   <Folder Name="/tests/">
     <Project Path="tests/FlowOnRails.Tests/FlowOnRails.Tests.csproj" />
+    <Project Path="tests/FlowOnRails.PublicApi.Tests/FlowOnRails.PublicApi.Tests.csproj" />
   </Folder>
 </Solution>

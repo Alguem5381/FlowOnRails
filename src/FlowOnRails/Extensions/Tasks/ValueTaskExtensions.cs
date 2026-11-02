@@ -16,48 +16,49 @@ public static class ValueTaskExtensions
             where TNext : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? onSuccess()
-                : onFailure(rail.Error!);
+            return rail.Match(onSuccess, onFailure);
         }
 
-        /// <summary>
+            /// <summary>
         /// Binds the rail to another asynchronous operation if successful.
         /// </summary>
-        public async Task<Rail> BindAsync(Func<ValueTask<Rail>> bind)
+        public async ValueTask<Rail> BindAsync(Func<ValueTask<Rail>> bind)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? await bind().ConfigureAwait(false)
-                : rail;
+            if (rail.IsFailure)
+                return rail;
+
+            var next = await bind().ConfigureAwait(false);
+            return rail.Bind(() => next);
         }
 
         /// <summary>
         /// Binds the rail to another asynchronous operation if successful.
         /// </summary>
-        public async Task<RailFor<TOut>> BindAsync<TOut>(Func<ValueTask<RailFor<TOut>>> bind)
+        public async ValueTask<RailFor<TOut>> BindAsync<TOut>(Func<ValueTask<RailFor<TOut>>> bind)
             where TOut : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? await bind().ConfigureAwait(false)
-                : RailFor<TOut>.Fail(rail.Error!);
+            if (rail.IsFailure)
+                return RailFor<TOut>.Fail(rail.Error!);
+
+            var next = await bind().ConfigureAwait(false);
+            return rail.Bind(() => next);
         }
 
         /// <summary>
         /// Executes an action asynchronously if the rail is successful, returning the original rail.
         /// </summary>
-        public async Task<Rail> TapAsync(Action action)
+        public async ValueTask<Rail> TapAsync(Action action)
         {
             var rail = await task.ConfigureAwait(false);
-            if (rail.IsSuccess) action();
-            return rail;
+            return rail.Tap(action);
         }
 
         /// <summary>
         /// Executes an action asynchronously if the rail is successful, returning the original rail.
         /// </summary>
-        public async Task<Rail> TapAsync(Func<ValueTask> action)
+        public async ValueTask<Rail> TapAsync(Func<ValueTask> action)
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsSuccess) await action().ConfigureAwait(false);
@@ -67,20 +68,16 @@ public static class ValueTaskExtensions
         /// <summary>
         /// Ensures that the specified predicate is true asynchronously. If false, returns a failed rail with the provided error.
         /// </summary>
-        public async Task<Rail> EnsureAsync(Func<bool> predicate, Error error)
+        public async ValueTask<Rail> EnsureAsync(Func<bool> predicate, Error error)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsFailure
-                ? rail
-                : predicate()
-                    ? rail
-                    : Rail.Fail(error);
+            return rail.Ensure(predicate, error);
         }
 
         /// <summary>
         /// Executes an action asynchronously if the rail is successful and the condition is true.
         /// </summary>
-        public async Task<Rail> TapIfAsync(bool condition, Func<ValueTask> action)
+        public async ValueTask<Rail> TapIfAsync(bool condition, Func<ValueTask> action)
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsSuccess && condition) await action().ConfigureAwait(false);
@@ -90,66 +87,68 @@ public static class ValueTaskExtensions
         /// <summary>
         /// Executes an action asynchronously if the rail is successful and the predicate evaluates to true.
         /// </summary>
-        public async Task<Rail> TapIfAsync(Func<bool> predicate, Func<ValueTask> action)
+        public async ValueTask<Rail> TapIfAsync(Func<bool> predicate, Func<ValueTask> action)
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsSuccess && predicate()) await action().ConfigureAwait(false);
             return rail;
         }
 
-        /// <summary>
-        /// Recovers from a failed rail asynchronously by invoking the fallback function.
+            /// <summary>
+        /// Replaces a failed rail asynchronously with the rail returned by the fallback function.
         /// </summary>
-        public async Task<Rail> RecoverAsync(Func<Error, ValueTask<Rail>> fallback)
+        public async ValueTask<Rail> RecoverWithAsync(Func<Error, ValueTask<Rail>> fallback)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? rail
-                : await fallback(rail.Error!).ConfigureAwait(false);
+            if (rail.IsSuccess)
+                return rail;
+
+            var next = await fallback(rail.Error!).ConfigureAwait(false);
+            return rail.RecoverWith(_ => next);
         }
 
         /// <summary>
         /// Maps a successful rail to a new value asynchronously.
         /// </summary>
-        public async Task<RailFor<TOut>> MapAsync<TOut>(Func<TOut> map) where TOut : notnull
+        public async ValueTask<RailFor<TOut>> MapAsync<TOut>(Func<TOut> map) where TOut : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? RailFor<TOut>.CreateSuccess(map())
-                : RailFor<TOut>.Fail(rail.Error!);
+            return rail.Map(map);
         }
 
         /// <summary>
         /// Maps a successful rail to a new value asynchronously.
         /// </summary>
-        public async Task<RailFor<TOut>> MapAsync<TOut>(Func<ValueTask<TOut>> map) where TOut : notnull
+        public async ValueTask<RailFor<TOut>> MapAsync<TOut>(Func<ValueTask<TOut>> map) where TOut : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? RailFor<TOut>.CreateSuccess(await map().ConfigureAwait(false))
-                : RailFor<TOut>.Fail(rail.Error!);
+            if (rail.IsFailure)
+                return RailFor<TOut>.Fail(rail.Error!);
+
+            var value = await map().ConfigureAwait(false);
+            return rail.Map(() => value);
         }
 
         /// <summary>
         /// Maps the error of a failed rail to another error asynchronously.
         /// </summary>
-        public async Task<Rail> MapErrorAsync(Func<Error, Error> errorMapper)
+        public async ValueTask<Rail> MapErrorAsync(Func<Error, Error> errorMapper)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? rail
-                : Rail.Fail(errorMapper(rail.Error!));
+            return rail.MapError(errorMapper);
         }
 
         /// <summary>
         /// Maps the error of a failed rail to another error asynchronously.
         /// </summary>
-        public async Task<Rail> MapErrorAsync(Func<Error, ValueTask<Error>> errorMapper)
+        public async ValueTask<Rail> MapErrorAsync(Func<Error, ValueTask<Error>> errorMapper)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? rail
-                : Rail.Fail(await errorMapper(rail.Error!).ConfigureAwait(false));
+            if (rail.IsSuccess)
+                return rail;
+
+            var error = await errorMapper(rail.Error!).ConfigureAwait(false);
+            return rail.MapError(_ => error);
         }
     }
 }
