@@ -17,11 +17,11 @@ public readonly partial struct Rail
     /// }
     /// </code>
     /// </example>
-    public bool TryUnwrap([NotNullWhen(false)] out Error
-        ? error)
+    public bool TryUnwrap([NotNullWhen(false)] out Error? error)
     {
+        var isSuccess = IsSuccess;
         error = Error!;
-        return IsSuccess;
+        return isSuccess;
     }
 
     /// <summary>
@@ -65,18 +65,17 @@ public readonly partial struct Rail
     }
 
     /// <summary>
-    /// Recovers from a failed rail by executing the fallback function.
+    /// Replaces a failed rail with the rail returned by the fallback function.
     /// </summary>
-    /// <example>
-    /// <code>
-    /// var rail = ExecuteOperation()
-    ///     .Recover(error => Rail.Ok()); // Fallback to success
-    /// </code>
-    /// </example>
-    public Rail Recover(Func<Error, Rail> fallback) =>
-        IsSuccess
-            ? this
-            : fallback(Error!);
+    public Rail RecoverWith(Func<Error, Rail> fallback)
+    {
+        if (IsSuccess)
+            return this;
+
+        var next = fallback(Error!);
+        _ = next.IsSuccess;
+        return next;
+    }
 
     /// <summary>
     /// Binds the rail to another rail using the given function if successful.
@@ -89,10 +88,15 @@ public readonly partial struct Rail
     ///     .Bind(() => SaveUserToDatabase());
     /// </code>
     /// </example>
-    public Rail Bind(Func<Rail> bind) =>
-        IsSuccess
-            ? bind()
-            : new Rail(isSuccess: false, Error);
+    public Rail Bind(Func<Rail> bind)
+    {
+        if (IsFailure)
+            return this;
+
+        var next = bind();
+        _ = next.IsSuccess;
+        return next;
+    }
 
 
     /// <summary>
@@ -118,31 +122,34 @@ public readonly partial struct Rail
     /// <code>
     /// string message = rail.Match(
     ///     onSuccess: () => "Operation was successful!",
-    ///     onFailure: error => $"Operation failed: {error.Message}"
+    ///     onFailure: error => $"Operation failed: {error}"
     /// );
     /// </code>
     /// </example>
-    public TNext Match<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure)
-    {
-        return IsSuccess
+    public TNext Match<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure) =>
+        IsSuccess
             ? onSuccess()
             : onFailure(Error!);
-    }
 
     /// <summary>
     /// Binds the rail to another rail that returns a value using the given function if successful.
     /// </summary>
-    public RailFor<TNext> Bind<TNext>(Func<RailFor<TNext>> bind) where TNext : notnull =>
-        IsSuccess
-            ? bind()
-            : RailFor<TNext>.Fail(Error!);
+    public RailFor<TNext> Bind<TNext>(Func<RailFor<TNext>> bind) where TNext : notnull
+    {
+        if (IsFailure)
+            return RailFor<TNext>.Fail(Error!);
+
+        var next = bind();
+        _ = next.IsSuccess;
+        return next;
+    }
 
     /// <summary>
     /// Maps a successful rail to a rail with a value.
     /// </summary>
     public RailFor<TNext> Map<TNext>(Func<TNext> map) where TNext : notnull =>
         IsSuccess
-            ? RailFor<TNext>.Ok(map())
+            ? RailFor<TNext>.CreateSuccess(map())
             : RailFor<TNext>.Fail(Error!);
 
     /// <summary>

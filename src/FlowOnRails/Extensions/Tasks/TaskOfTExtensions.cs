@@ -72,7 +72,7 @@ public static class TaskOfTExtensions
         {
             var rail = await task.ConfigureAwait(false);
             return rail.IsSuccess
-                ? RailFor<TOut>.Ok(map(rail.Value))
+                ? RailFor<TOut>.CreateSuccess(map(rail.Value))
                 : RailFor<TOut>.Fail(rail.Error!);
         }
 
@@ -83,7 +83,7 @@ public static class TaskOfTExtensions
         {
             var rail = await task.ConfigureAwait(false);
             return rail.IsSuccess
-                ? RailFor<TOut>.Ok(await map(rail.Value).ConfigureAwait(false))
+                ? RailFor<TOut>.CreateSuccess(await map(rail.Value).ConfigureAwait(false))
                 : RailFor<TOut>.Fail(rail.Error!);
         }
 

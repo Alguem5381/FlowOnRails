@@ -86,7 +86,7 @@ public class ResultOperationsTests
     }
 
     [Fact]
-    public void Recover_OnFailure_ExecutesFallback()
+    public void RecoverWith_OnFailure_ExecutesFallback()
     {
         var error = new TestError("Failure");
         var rail = Rail.Fail(error);
@@ -95,19 +95,19 @@ public class ResultOperationsTests
         var fallback = new Mock<Func<Error, Rail>>();
         fallback.Setup(f => f(error)).Returns(recoveredRail);
 
-        var finalRail = rail.Recover(fallback.Object);
+        var finalRail = rail.RecoverWith(fallback.Object);
 
         fallback.Verify(f => f(error), Times.Once);
         Assert.Equal(recoveredRail, finalRail);
     }
 
     [Fact]
-    public void Recover_OnSuccess_DoesNotExecuteFallback()
+    public void RecoverWith_OnSuccess_DoesNotExecuteFallback()
     {
         var rail = Rail.Ok();
         var fallback = new Mock<Func<Error, Rail>>();
 
-        var finalRail = rail.Recover(fallback.Object);
+        var finalRail = rail.RecoverWith(fallback.Object);
 
         fallback.Verify(f => f(It.IsAny<Error>()), Times.Never);
         Assert.Equal(rail, finalRail);
@@ -216,10 +216,10 @@ public class ResultOperationsTests
     public void Bind_ToRailFor_OnSuccess_ReturnsRailFor()
     {
         var rail = Rail.Ok();
-        var nextRail = RailFor<int>.Ok(42);
-        
+        var nextRail = Rail.Ok(42);
+
         var finalRail = rail.Bind(() => nextRail);
-        
+
         Assert.True(finalRail.IsSuccess);
         Assert.Equal(42, finalRail.Value);
     }
@@ -228,9 +228,9 @@ public class ResultOperationsTests
     public void Map_ToValue_OnSuccess_ReturnsRailFor()
     {
         var rail = Rail.Ok();
-        
+
         var finalRail = rail.Map(() => 42);
-        
+
         Assert.True(finalRail.IsSuccess);
         Assert.Equal(42, finalRail.Value);
     }
@@ -240,9 +240,9 @@ public class ResultOperationsTests
     {
         var error = new TestError("Original");
         var rail = Rail.Fail(error);
-        
+
         var finalRail = rail.MapError(e => new TestError($"Mapped: {((TestError)e).Message}"));
-        
+
         Assert.True(finalRail.IsFailure);
         Assert.Equal("Mapped: Original", ((TestError)finalRail.Error!).Message);
     }

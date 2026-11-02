@@ -115,7 +115,7 @@ public static class ValueTaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             return rail.IsSuccess
-                ? RailFor<TOut>.Ok(map())
+                ? RailFor<TOut>.CreateSuccess(map())
                 : RailFor<TOut>.Fail(rail.Error!);
         }
 
@@ -126,7 +126,7 @@ public static class ValueTaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             return rail.IsSuccess
-                ? RailFor<TOut>.Ok(await map().ConfigureAwait(false))
+                ? RailFor<TOut>.CreateSuccess(await map().ConfigureAwait(false))
                 : RailFor<TOut>.Fail(rail.Error!);
         }
 
