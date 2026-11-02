@@ -16,5 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/FlowOnRails/FlowOnRails.csproj" />
+    <EmbeddedResource Include="../../README.md" LogicalName="README.md" />
+    <EmbeddedResource Include="ReadmeExample.cs" LogicalName="ReadmeExample.cs" />
   </ItemGroup>
 </Project>

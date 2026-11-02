@@ -6,7 +6,7 @@ FlowOnRails is a library built to bring Railway Oriented Programming to C# nativ
 
 ## Features
 
-- Zero Allocations. Built with readonly partial structs. Returning successful results does not allocate memory on the heap.
+- Value Types. Results use readonly partial structs; the application defines its values and errors.
 - Strong Typing. It avoids using strings or hidden exceptions for errors. You create your own error records inheriting from a base Error class.
 - LINQ Support. You can write complex flows using native C# query syntax.
 - Async Integration. Built-in extensions for Task and ValueTask.
@@ -37,13 +37,13 @@ The library uses Rail for flows that do not return data and RailFor for flows wi
 public RailFor<User> GetUser(int id)
 {
     if (id <= 0)
-        return Rail.Fail(new ValidationError("ID must be positive."));
+        return Rail.Fail<User>(new ValidationError("ID must be positive."));
 
     var user = Database.Find(id);
     if (user is null)
-        return Rail.Fail(new NotFoundError("User not found."));
+        return Rail.Fail<User>(new NotFoundError("User not found."));
 
-    return RailFor<User>.Ok(user);
+    return Rail.Ok(user);
 }
 ```
 
@@ -73,7 +73,7 @@ var rail = GetUser(10);
 
 if (!rail.TryUnwrap(out var user, out var error))
 {
-    Console.WriteLine($"Failed: {error.Message}");
+    Console.WriteLine($"Failed: {error}");
     return;
 }
 
@@ -86,9 +86,59 @@ FlowOnRails provides extensions like BindAsync, MapAsync and MapErrorAsync for a
 
 ```csharp
 var result = await GetUserAsync(id)
-    .MapErrorAsync(e => new DomainError($"Failed to fetch user: {e.Message}"))
+    .MapErrorAsync(e => new DomainError($"Failed to fetch user: {e}"))
     .BindAsync(user => ProcessUserAsync(user));
 ```
+
+### Async families and migration to 0.2.0
+
+Task extensions return `Task`; ValueTask extensions return `ValueTask`, so a pipeline stays in the same asynchronous family. Use asynchronous callbacks from that family. For example:
+
+```csharp
+ValueTask<RailFor<int>> result = ValueTask.FromResult(Rail.Ok(1))
+    .MapAsync(value => value + 1)
+    .MapAsync(value => ValueTask.FromResult(value + 1));
+```
+
+For `Task<RailFor<T>>` sources, callbacks returning `ValueTask` use the explicit `BindValueTaskAsync` bridge, which returns a `Task`:
+
+```csharp
+var result = await Rail.OkAsync(1)
+    .BindValueTaskAsync(value => ValueTask.FromResult(Rail.Ok(value + 1)));
+```
+
+Migration from the previous signatures:
+
+- ValueTask extension results now have type `ValueTask<...>`. Existing `await` calls still work; use `.AsTask()` when another API requires a `Task`.
+- The two `BindAsync` overloads on `Task<RailFor<T>>` that accepted ValueTask callbacks are now named `BindValueTaskAsync`. Ordinary Task callbacks and `async` lambdas continue to use `BindAsync` without ambiguous overloads.
+- When mixing other callback types, convert explicitly at the boundary. A synchronous `MapAsync` overload can wrap an awaitable as a value, and an expression passed as `Action` can discard a returned awaitable. Keep compiler warnings enabled.
+
+### Recovery
+
+Use `Recover` on `RailFor<T>` to produce a replacement value. Use `RecoverWith` to run a fallback that returns another rail, which may itself fail:
+
+```csharp
+var value = Rail.Fail<int>(new NotFoundError("Missing value"))
+    .Recover(_ => 42);
+
+var fallback = Rail.Fail<int>(new NotFoundError("Missing value"))
+    .RecoverWith(_ => Rail.Ok(42));
+
+var completed = Rail.Fail(new NotFoundError("Missing operation"))
+    .RecoverWith(_ => Rail.Ok());
+```
+
+Task and ValueTask extensions provide `RecoverAsync` for typed replacement values and `RecoverWithAsync` for fallback rails. Callbacks should return the same asynchronous family as the source.
+
+### Additional changes in 0.2.0
+
+- Construct results through `Rail.Ok(...)` and `Rail.Fail<T>(error)`. The old public `RailFor<T>.Ok` and `RailFor<T>.Fail` factories are no longer public.
+- `IRail` and its explicit `TryGetError` method have been removed. Use `IsFailure`, `TryUnwrap` or `Match` on the concrete rail type.
+- Calls to the previous `Recover` / `RecoverAsync` that return a rail should use `RecoverWith` / `RecoverWithAsync`.
+- Observing or operating on `default(Rail)` or `default(RailFor<T>)` throws `InvalidOperationException`. Construct a successful or failed result explicitly. `Bind` and `RecoverWith` also reject an uninitialized rail returned by a callback.
+- Factories reject null values and null errors. Callback exceptions and cancellation propagate rather than becoming domain errors.
+
+See [operation semantics](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/operation-semantics.md) for the current contract. Semantic success records are deferred; the rationale and archived implementation are described in the [design note](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/design/semantic-success.md). Domain result variants belong in the application's value types.
 
 ## Contributing
 
