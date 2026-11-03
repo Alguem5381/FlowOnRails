@@ -12,6 +12,18 @@
     <File Path="FlowOnRails.slnx" />
     <File Path="LICENSE" />
     <File Path="README.md" />
+    <File Path="CHANGELOG.md" />
+  </Folder>
+  <Folder Name="/Solution Items/Workflows/">
+    <File Path=".github\workflows\cd.yml" />
+    <File Path=".github\workflows\ci.yml" />
+  </Folder>
+
+  <Folder Name="/Solution Items/Docs/">
+    <File Path="docs/operation-semantics.md" />
+    <File Path="docs/revisao-0.2.0.md" />
+    <File Path="docs/publishing.md" />
+    <File Path="docs/design/semantic-success.md" />
   </Folder>
 
   <Folder Name="/src/">
@@ -20,5 +32,6 @@
 
   <Folder Name="/tests/">
     <Project Path="tests/FlowOnRails.Tests/FlowOnRails.Tests.csproj" />
+    <Project Path="tests/FlowOnRails.PublicApi.Tests/FlowOnRails.PublicApi.Tests.csproj" />
   </Folder>
 </Solution>

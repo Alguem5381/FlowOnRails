@@ -24,12 +24,10 @@ public static class TaskExtensions
             where TNext : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? onSuccess()
-                : onFailure(rail.Error!);
+            return rail.Match(onSuccess, onFailure);
         }
 
-        /// <summary>
+            /// <summary>
         /// Binds the rail to another asynchronous operation if successful.
         /// </summary>
         /// <example>
@@ -41,9 +39,11 @@ public static class TaskExtensions
         public async Task<Rail> BindAsync(Func<Task<Rail>> bind)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? await bind().ConfigureAwait(false)
-                : rail;
+            if (rail.IsFailure)
+                return rail;
+
+            var next = await bind().ConfigureAwait(false);
+            return rail.Bind(() => next);
         }
 
         /// <summary>
@@ -52,9 +52,11 @@ public static class TaskExtensions
         public async Task<RailFor<TOut>> BindAsync<TOut>(Func<Task<RailFor<TOut>>> bind) where TOut : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? await bind().ConfigureAwait(false)
-                : RailFor<TOut>.Fail(rail.Error!);
+            if (rail.IsFailure)
+                return RailFor<TOut>.Fail(rail.Error!);
+
+            var next = await bind().ConfigureAwait(false);
+            return rail.Bind(() => next);
         }
 
         /// <summary>
@@ -63,11 +65,7 @@ public static class TaskExtensions
         public async Task<Rail> TapAsync(Action action)
         {
             var rail = await task.ConfigureAwait(false);
-
-            if (rail.IsSuccess)
-                action();
-
-            return rail;
+            return rail.Tap(action);
         }
 
         /// <summary>
@@ -76,7 +74,6 @@ public static class TaskExtensions
         public async Task<Rail> TapAsync(Func<Task> action)
         {
             var rail = await task.ConfigureAwait(false);
-
             if (rail.IsSuccess)
                 await action().ConfigureAwait(false);
 
@@ -89,11 +86,7 @@ public static class TaskExtensions
         public async Task<Rail> EnsureAsync(Func<bool> predicate, Error error)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsFailure
-                ? rail
-                : predicate()
-                    ? rail
-                    : Rail.Fail(error);
+            return rail.Ensure(predicate, error);
         }
 
         /// <summary>
@@ -122,15 +115,17 @@ public static class TaskExtensions
             return rail;
         }
 
-        /// <summary>
-        /// Recovers from a failed rail asynchronously by invoking the fallback function.
+            /// <summary>
+        /// Replaces a failed rail asynchronously with the rail returned by the fallback function.
         /// </summary>
-        public async Task<Rail> RecoverAsync(Func<Error, Task<Rail>> fallback)
+        public async Task<Rail> RecoverWithAsync(Func<Error, Task<Rail>> fallback)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? rail
-                : await fallback(rail.Error!).ConfigureAwait(false);
+            if (rail.IsSuccess)
+                return rail;
+
+            var next = await fallback(rail.Error!).ConfigureAwait(false);
+            return rail.RecoverWith(_ => next);
         }
 
         /// <summary>
@@ -139,9 +134,7 @@ public static class TaskExtensions
         public async Task<RailFor<TOut>> MapAsync<TOut>(Func<TOut> map) where TOut : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? RailFor<TOut>.Ok(map())
-                : RailFor<TOut>.Fail(rail.Error!);
+            return rail.Map(map);
         }
 
         /// <summary>
@@ -150,9 +143,11 @@ public static class TaskExtensions
         public async Task<RailFor<TOut>> MapAsync<TOut>(Func<Task<TOut>> map) where TOut : notnull
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? RailFor<TOut>.Ok(await map().ConfigureAwait(false))
-                : RailFor<TOut>.Fail(rail.Error!);
+            if (rail.IsFailure)
+                return RailFor<TOut>.Fail(rail.Error!);
+
+            var value = await map().ConfigureAwait(false);
+            return rail.Map(() => value);
         }
 
         /// <summary>
@@ -161,9 +156,7 @@ public static class TaskExtensions
         public async Task<Rail> MapErrorAsync(Func<Error, Error> errorMapper)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? rail
-                : Rail.Fail(errorMapper(rail.Error!));
+            return rail.MapError(errorMapper);
         }
 
         /// <summary>
@@ -172,9 +165,11 @@ public static class TaskExtensions
         public async Task<Rail> MapErrorAsync(Func<Error, Task<Error>> errorMapper)
         {
             var rail = await task.ConfigureAwait(false);
-            return rail.IsSuccess
-                ? rail
-                : Rail.Fail(await errorMapper(rail.Error!).ConfigureAwait(false));
+            if (rail.IsSuccess)
+                return rail;
+
+            var error = await errorMapper(rail.Error!).ConfigureAwait(false);
+            return rail.MapError(_ => error);
         }
     }
 }

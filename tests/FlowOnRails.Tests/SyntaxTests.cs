@@ -7,7 +7,7 @@ public class SyntaxTests
     [Fact]
     public void Select_TransformsValue()
     {
-        var rail = RailFor<int>.Ok(5);
+        var rail = Rail.Ok(5);
 
         var query = from x in rail
             select x * 2;
@@ -32,8 +32,8 @@ public class SyntaxTests
     [Fact]
     public void SelectMany_BothSuccess_ReturnsCombinedValue()
     {
-        var result1 = RailFor<int>.Ok(5);
-        var result2 = RailFor<int>.Ok(10);
+        var result1 = Rail.Ok(5);
+        var result2 = Rail.Ok(10);
 
         var query = from x in result1
             from y in result2
@@ -48,7 +48,7 @@ public class SyntaxTests
     {
         var error1 = new TestError("Failure 1");
         var result1 = RailFor<int>.Fail(error1);
-        var result2 = RailFor<int>.Ok(10);
+        var result2 = Rail.Ok(10);
 
         var query = from x in result1
             from y in result2
@@ -61,7 +61,7 @@ public class SyntaxTests
     [Fact]
     public void SelectMany_SecondFails_ReturnsSecondFailure()
     {
-        var result1 = RailFor<int>.Ok(5);
+        var result1 = Rail.Ok(5);
         var error2 = new TestError("Failure 2");
         var result2 = RailFor<int>.Fail(error2);
 

@@ -1,28 +1,39 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace FlowOnRails;
 
 /// <summary>
 /// Represents the rail of an operation that returns a value.
 /// </summary>
 /// <typeparam name="TValue">The type of the value returned by the operation.</typeparam>
-public readonly partial struct RailFor<TValue> : IRail, IEquatable<RailFor<TValue>> where TValue : notnull
+public readonly partial struct RailFor<TValue> : IEquatable<RailFor<TValue>> where TValue : notnull
 {
-    /// <inheritdoc/>
-    public bool IsSuccess { get; }
+    private readonly Error? _error;
 
-    /// <inheritdoc/>
-    public bool IsFailure { get => !IsSuccess; }
+    /// <summary>
+    /// Gets a value indicating whether the operation was successful.
+    /// </summary>
+    public bool IsSuccess
+    {
+        get
+        {
+            RailState.EnsureInitialized(field, _error);
+            return field;
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the operation failed.
+    /// </summary>
+    public bool IsFailure => !IsSuccess;
 
     /// <summary>
     /// Gets the error associated with a failed rail. Null if the operation was successful.
     /// </summary>
-    internal Error? Error { get; }
+    internal Error? Error => _error;
 
     /// <summary>
     /// Gets the value associated with a successful rail.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown if accessed on a failed rail.</exception>
+    /// <remarks>Only meaningful after validating that the rail is successful; unused on failure.</remarks>
     internal TValue Value { get; }
 
     private RailFor(bool isSuccess, Error? error, TValue? value)
@@ -30,26 +41,15 @@ public readonly partial struct RailFor<TValue> : IRail, IEquatable<RailFor<TValu
         if (isSuccess && value is null)
             throw new ArgumentNullException(nameof(value), "A success rail should contain a non-null value.");
 
+        RailState.EnsureValid(isSuccess, error);
+
         Value = value!;
-        Error = error;
+        _error = error;
         IsSuccess = isSuccess;
     }
 
-    /// <summary>
-    /// Creates a successful rail containing the specified value.
-    /// </summary>
-    /// <param name="value">The value to wrap in the rail.</param>
-    /// <returns>A successful <see cref="RailFor{TValue}"/>.</returns>
-    /// <example>
-    /// <code>
-    /// var rail = RailFor&lt;int&gt;.Ok(42);
-    /// if (rail.TryUnwrap(out var value, out var error))
-    /// {
-    ///     Console.WriteLine($"Success: {value}");
-    /// }
-    /// </code>
-    /// </example>
-    public static RailFor<TValue> Ok(TValue value) => new(isSuccess: true, error: null, value);
+    internal static RailFor<TValue> CreateSuccess(TValue value) =>
+        new(isSuccess: true, error: null, value);
 
     /// <summary>
     /// Creates a failed rail with the specified error.
@@ -60,16 +60,20 @@ public readonly partial struct RailFor<TValue> : IRail, IEquatable<RailFor<TValu
     /// <code>
     /// public record NotFoundError(string Message) : Error;
     /// 
-    /// return RailFor&lt;User&gt;.Fail(new NotFoundError("User not found"));
+    /// return Rail.Fail&lt;User&gt;(new NotFoundError("User not found"));
     /// </code>
     /// </example>
-    public static RailFor<TValue> Fail(Error error) => new(isSuccess: false, error: error, default);
+    internal static RailFor<TValue> Fail(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return new RailFor<TValue>(isSuccess: false, error: error, value: default);
+    }
 
     /// <summary>
     /// Implicitly converts a value into a successful rail.
     /// </summary>
     /// <param name="value">The value.</param>
-    public static implicit operator RailFor<TValue>(TValue value) => Ok(value);
+    public static implicit operator RailFor<TValue>(TValue value) => CreateSuccess(value);
 
     /// <summary>
     /// Implicitly converts an error into a failed rail.
@@ -77,20 +81,20 @@ public readonly partial struct RailFor<TValue> : IRail, IEquatable<RailFor<TValu
     /// <param name="error">The error.</param>
     public static implicit operator RailFor<TValue>(Error error) => Fail(error);
 
-    bool IRail.TryGetError([NotNullWhen(true)] out Error? error)
-    {
-        error = Error;
-        return IsFailure;
-    }
-
     /// <summary>
     /// Indicates whether the current rail is equal to another rail.
     /// </summary>
     public bool Equals(RailFor<TValue> other)
     {
-        if (IsSuccess != other.IsSuccess) return false;
-        if (IsSuccess) return EqualityComparer<TValue>.Default.Equals(Value, other.Value);
-        return EqualityComparer<Error?>.Default.Equals(Error, other.Error);
+        var isSuccess = IsSuccess;
+
+        if (isSuccess != other.IsSuccess)
+            return false;
+
+        if (!EqualityComparer<Error?>.Default.Equals(_error, other._error))
+            return false;
+
+        return !isSuccess || EqualityComparer<TValue>.Default.Equals(Value, other.Value);
     }
 
     /// <summary>
@@ -101,8 +105,13 @@ public readonly partial struct RailFor<TValue> : IRail, IEquatable<RailFor<TValu
     /// <summary>
     /// Returns the hash code for this instance.
     /// </summary>
-    public override int GetHashCode() =>
-        IsSuccess ? HashCode.Combine(IsSuccess, Value) : HashCode.Combine(IsSuccess, Error);
+    public override int GetHashCode()
+    {
+        var isSuccess = IsSuccess;
+        return isSuccess
+            ? HashCode.Combine(isSuccess, Value, _error)
+            : HashCode.Combine(isSuccess, _error);
+    }
 
     /// <summary>
     /// Compares two rails for equality.

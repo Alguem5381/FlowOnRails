@@ -1,0 +1,66 @@
+name: Publish to NuGet
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          package_version="$(dotnet msbuild src/FlowOnRails/FlowOnRails.csproj -getProperty:PackageVersion)"
+          if [[ "${RELEASE_TAG#v}" != "$package_version" ]]; then
+            echo "Release tag '$RELEASE_TAG' does not match package version '$package_version'." >&2
+            exit 1
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore FlowOnRails.slnx
+
+      - name: Build
+        run: dotnet build FlowOnRails.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test FlowOnRails.slnx --configuration Release --no-build --no-restore --verbosity normal
+
+      - name: Pack
+        run: dotnet pack src/FlowOnRails/FlowOnRails.csproj --configuration Release --no-build --no-restore --output ./nupkg
+
+      - name: NuGet Login
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: alguem5381
+
+      - name: Publish to NuGet
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: >-
+          dotnet nuget push ./nupkg/*.nupkg
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json

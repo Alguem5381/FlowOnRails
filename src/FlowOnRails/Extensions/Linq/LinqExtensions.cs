@@ -32,7 +32,7 @@ public static class LinqExtensions
                 list.Add(rail.Value);
             }
 
-            return RailFor<IReadOnlyList<T>>.Ok(list);
+            return RailFor<IReadOnlyList<T>>.CreateSuccess(list);
         }
 
         /// <summary>
@@ -44,13 +44,17 @@ public static class LinqExtensions
         /// </code>
         /// </example>
         public IEnumerable<T> SelectOks() =>
-            from rail in results where rail.IsSuccess select rail.Value;
+            from rail in results
+            where rail.IsSuccess
+            select rail.Value;
 
         /// <summary>
         /// Filters the sequence of results, returning only the errors of failed results.
         /// </summary>
         public IEnumerable<Error> SelectErrors() =>
-            from rail in results where rail.IsFailure select rail.Error!;
+            from rail in results
+            where rail.IsFailure
+            select rail.Error!;
 
         /// <summary>
         /// Partitions the sequence of results into a tuple containing a list of successful values and a list of errors.

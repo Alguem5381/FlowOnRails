@@ -36,7 +36,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Ensure_OnSuccessAndPredicateTrue_ReturnsSuccess()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var error = new TestError("Ensure error");
 
         var finalRail = rail.Ensure(v => v == "Value", error);
@@ -47,7 +47,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Ensure_OnSuccessAndPredicateFalse_ReturnsFailure()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var error = new TestError("Ensure error");
 
         var finalRail = rail.Ensure(v => v != "Value", error);
@@ -74,7 +74,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Tap_OnSuccess_ExecutesActionWithValue()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var mockAction = new Mock<Action<string>>();
 
         var returnedRail = rail.Tap(mockAction.Object);
@@ -97,7 +97,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void TapIf_ConditionTrue_OnSuccess_ExecutesAction()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var mockAction = new Mock<Action<string>>();
 
         rail.TapIf(true, mockAction.Object);
@@ -108,7 +108,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void TapIf_PredicateTrue_OnSuccess_ExecutesAction()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var mockAction = new Mock<Action<string>>();
 
         rail.TapIf(v => v == "Value", mockAction.Object);
@@ -119,7 +119,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void TapIf_PredicateFalse_OnSuccess_DoesNotExecuteAction()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var mockAction = new Mock<Action<string>>();
 
         rail.TapIf(v => v != "Value", mockAction.Object);
@@ -128,28 +128,28 @@ public class ResultOfTOperationsTests
     }
 
     [Fact]
-    public void Recover_OnFailure_ExecutesFallback()
+    public void RecoverWith_OnFailure_ExecutesFallback()
     {
         var error = new TestError("Failure");
         var rail = RailFor<string>.Fail(error);
-        var recoveredRail = RailFor<string>.Ok("Recovered");
+        var recoveredRail = Rail.Ok("Recovered");
 
         var fallback = new Mock<Func<Error, RailFor<string>>>();
         fallback.Setup(f => f(error)).Returns(recoveredRail);
 
-        var finalRail = rail.Recover(fallback.Object);
+        var finalRail = rail.RecoverWith(fallback.Object);
 
         fallback.Verify(f => f(error), Times.Once);
         Assert.Equal(recoveredRail, finalRail);
     }
 
     [Fact]
-    public void Recover_OnSuccess_DoesNotExecuteFallback()
+    public void RecoverWith_OnSuccess_DoesNotExecuteFallback()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var fallback = new Mock<Func<Error, RailFor<string>>>();
 
-        var finalRail = rail.Recover(fallback.Object);
+        var finalRail = rail.RecoverWith(fallback.Object);
 
         fallback.Verify(f => f(It.IsAny<Error>()), Times.Never);
         Assert.Equal(rail, finalRail);
@@ -158,7 +158,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Match_OnSuccess_ExecutesOnSuccess()
     {
-        var rail = RailFor<string>.Ok("Value");
+        var rail = Rail.Ok("Value");
         var onSuccess = new Mock<Func<string, int>>();
         onSuccess.Setup(f => f("Value")).Returns(1);
         var onFailure = new Mock<Func<Error, int>>();
@@ -189,7 +189,7 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Map_OnSuccess_TransformsValue()
     {
-        var rail = RailFor<string>.Ok("123");
+        var rail = Rail.Ok("123");
         var map = new Mock<Func<string, int>>();
         map.Setup(m => m("123")).Returns(123);
 
@@ -217,8 +217,8 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Bind_OnSuccess_ExecutesBindFunction()
     {
-        var rail = RailFor<string>.Ok("123");
-        var nextRail = RailFor<int>.Ok(123);
+        var rail = Rail.Ok("123");
+        var nextRail = Rail.Ok(123);
         var bind = new Mock<Func<string, RailFor<int>>>();
         bind.Setup(b => b("123")).Returns(nextRail);
 
@@ -245,10 +245,10 @@ public class ResultOfTOperationsTests
     [Fact]
     public void Bind_ToRail_OnSuccess_ReturnsRail()
     {
-        var rail = RailFor<string>.Ok("Value");
-        
+        var rail = Rail.Ok("Value");
+
         var finalRail = rail.Bind(v => Rail.Ok());
-        
+
         Assert.True(finalRail.IsSuccess);
     }
 
@@ -257,9 +257,9 @@ public class ResultOfTOperationsTests
     {
         var error = new TestError("Original");
         var rail = RailFor<string>.Fail(error);
-        
+
         var finalRail = rail.MapError(e => new TestError($"Mapped: {((TestError)e).Message}"));
-        
+
         Assert.True(finalRail.IsFailure);
         Assert.Equal("Mapped: Original", ((TestError)finalRail.Error!).Message);
     }

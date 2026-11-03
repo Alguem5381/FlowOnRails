@@ -8,7 +8,7 @@ public class ResultOfTTests
     public void Ok_ReturnsSuccessfulResultWithValue()
     {
         var value = "Success Value";
-        var rail = RailFor<string>.Ok(value);
+        var rail = Rail.Ok(value);
 
         Assert.True(rail.IsSuccess);
         Assert.False(rail.IsFailure);
@@ -20,7 +20,7 @@ public class ResultOfTTests
     public void Ok_WithNullValue_ThrowsArgumentNullException()
     {
 #nullable disable
-        Assert.Throws<ArgumentNullException>(() => RailFor<string>.Ok(null));
+        Assert.Throws<ArgumentNullException>(() => Rail.Ok<string>(null));
 #nullable enable
     }
 
@@ -28,7 +28,7 @@ public class ResultOfTTests
     public void Fail_ReturnsFailedResultWithError()
     {
         var error = new TestError("Failure");
-        var rail = RailFor<string>.Fail(error);
+        var rail = Rail.Fail<string>(error);
 
         Assert.False(rail.IsSuccess);
         Assert.True(rail.IsFailure);
@@ -96,7 +96,7 @@ public class ResultOfTTests
     [Fact]
     public void ConversionToNonGenericResult_Success()
     {
-        var resultOfT = RailFor<string>.Ok("Value");
+        var resultOfT = Rail.Ok("Value");
         Rail rail = resultOfT;
 
         Assert.True(rail.IsSuccess);
@@ -106,7 +106,7 @@ public class ResultOfTTests
     public void ConversionToNonGenericResult_Failure()
     {
         var error = new TestError("Failure");
-        var resultOfT = RailFor<string>.Fail(error);
+        var resultOfT = Rail.Fail<string>(error);
         Rail rail = resultOfT;
 
         Assert.True(rail.IsFailure);

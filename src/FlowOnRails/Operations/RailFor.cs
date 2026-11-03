@@ -23,16 +23,23 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// </example>
     public bool TryUnwrap([NotNullWhen(true)] out TValue? value, [NotNullWhen(false)] out Error? error)
     {
-        value = Value;
-        error = Error!;
-        return IsSuccess;
+        var isSuccess = IsSuccess;
+
+        value = isSuccess ? Value : default;
+        error = Error;
+
+        return isSuccess;
     }
 
     /// <summary>
     /// Ensures that the specified predicate is true. If it is false, returns a failed rail with the provided error.
     /// </summary>
     public RailFor<TValue> Ensure(Func<TValue, bool> predicate, Error error) =>
-        IsFailure ? this : predicate(Value) ? this : Fail(error);
+        IsFailure
+            ? this
+            : predicate(Value)
+                ? this
+                : Fail(error);
 
     /// <summary>
     /// Executes the given action if the rail is successful, passing the value.
@@ -70,11 +77,24 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     }
 
     /// <summary>
-    /// Recovers from a failed rail by executing the fallback function.
+    /// Recovers from a failed rail by producing a value.
     /// </summary>
-    public RailFor<TValue> Recover(Func<Error, RailFor<TValue>> fallback)
+    public RailFor<TValue> Recover(Func<Error, TValue> recover) =>
+        IsSuccess
+            ? this
+            : CreateSuccess(recover(Error!));
+
+    /// <summary>
+    /// Replaces a failed rail with the rail returned by the fallback function.
+    /// </summary>
+    public RailFor<TValue> RecoverWith(Func<Error, RailFor<TValue>> fallback)
     {
-        return IsSuccess ? this : fallback(Error!);
+        if (IsSuccess)
+            return this;
+
+        var next = fallback(Error!);
+        _ = next.IsSuccess;
+        return next;
     }
 
     /// <summary>
@@ -92,10 +112,10 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// );
     /// </code>
     /// </example>
-    public TNext Match<TNext>(Func<TValue, TNext> onSuccess, Func<Error, TNext> onFailure) where TNext : notnull
-    {
-        return IsSuccess ? onSuccess(Value) : onFailure(Error!);
-    }
+    public TNext Match<TNext>(Func<TValue, TNext> onSuccess, Func<Error, TNext> onFailure) where TNext : notnull =>
+        IsSuccess
+            ? onSuccess(Value)
+            : onFailure(Error!);
 
     /// <summary>
     /// Maps the rail to another rail using the given function if successful.
@@ -109,7 +129,9 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// </code>
     /// </example>
     public RailFor<TResult> Map<TResult>(Func<TValue, TResult> map) where TResult : notnull =>
-        IsFailure ? RailFor<TResult>.Fail(Error!) : RailFor<TResult>.Ok(map(Value));
+        IsFailure
+            ? RailFor<TResult>.Fail(Error!)
+            : RailFor<TResult>.CreateSuccess(map(Value));
 
     /// <summary>
     /// Binds the rail to another rail using the given function if successful.
@@ -128,7 +150,9 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
         if (IsFailure)
             return RailFor<TResult>.Fail(Error!);
 
-        return bind(Value);
+        var next = bind(Value);
+        _ = next.IsSuccess;
+        return next;
     }
 
     /// <summary>
@@ -139,12 +163,47 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
         if (IsFailure)
             return Rail.Fail(Error!);
 
-        return bind(Value);
+        var next = bind(Value);
+        _ = next.IsSuccess;
+        return next;
+    }
+
+    /// <summary>
+    /// Executes a fallible operation on success, preserving the original value if it succeeds.
+    /// </summary>
+    /// <param name="check">The operation to check using the current value.</param>
+    /// <returns>The original rail on success, or a failed rail containing the checked operation's error.</returns>
+    /// <remarks>Existing failures skip the callback. Uninitialized rails throw InvalidOperationException; callback exceptions propagate.</remarks>
+    public RailFor<TValue> Check(Func<TValue, Rail> check)
+    {
+        if (IsFailure)
+            return this;
+
+        var next = check(Value);
+        return next.IsFailure ? Fail(next.Error!) : this;
+    }
+
+    /// <summary>
+    /// Executes a fallible operation on success, discarding its value and preserving the original value if it succeeds.
+    /// </summary>
+    /// <typeparam name="TChecked">The type of the discarded value.</typeparam>
+    /// <param name="check">The operation to check using the current value.</param>
+    /// <returns>The original rail on success, or a failed rail containing the checked operation's error.</returns>
+    /// <remarks>Existing failures skip the callback. Uninitialized rails throw InvalidOperationException; callback exceptions propagate.</remarks>
+    public RailFor<TValue> Check<TChecked>(Func<TValue, RailFor<TChecked>> check) where TChecked : notnull
+    {
+        if (IsFailure)
+            return this;
+
+        var next = check(Value);
+        return next.IsFailure ? Fail(next.Error!) : this;
     }
 
     /// <summary>
     /// Maps the error of a failed rail to another error synchronously.
     /// </summary>
     public RailFor<TValue> MapError(Func<Error, Error> errorMapper) =>
-        IsSuccess ? this : Fail(errorMapper(Error!));
+        IsSuccess
+            ? this
+            : Fail(errorMapper(Error!));
 }
