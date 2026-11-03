@@ -4,6 +4,8 @@
 
 ### Added
 
+- Initial `FlowOnRails.AspNetCore` project with tree-based error visibility, ancestor projection candidates, exact-controller overrides, validated immutable configuration and ASP.NET endpoint metadata integration. HTTP translation and package publication are deferred.
+
 - `TapError` and Task/ValueTask `TapErrorAsync` to observe the original error on failure while preserving the rail. Asynchronous observers are awaited.
 - Lazy `Ensure` / `EnsureAsync` error-factory overloads, allowing errors to include the current value and creating them only when the predicate fails.
 
