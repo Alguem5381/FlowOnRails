@@ -55,6 +55,18 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     }
 
     /// <summary>
+    /// Observes the original error on failure, preserving the rail.
+    /// </summary>
+    /// <remarks>Successful rails skip the callback. Callback exceptions propagate.</remarks>
+    public RailFor<TValue> TapError(Action<Error> tap)
+    {
+        if (IsFailure)
+            tap(Error);
+
+        return this;
+    }
+
+    /// <summary>
     /// Executes the given action if the rail is successful and the condition is met.
     /// </summary>
     public RailFor<TValue> TapIf(bool condition, Action<TValue> tap)

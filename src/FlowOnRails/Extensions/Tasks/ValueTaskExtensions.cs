@@ -10,6 +10,28 @@ public static class ValueTaskExtensions
     extension(ValueTask<Rail> task)
     {
         /// <summary>
+        /// Observes the original error on failure after awaiting the source, preserving the rail.
+        /// </summary>
+        public async ValueTask<Rail> TapErrorAsync(Action<Error> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.TapError(action);
+        }
+
+        /// <summary>
+        /// Awaits an error observer on failure, preserving the rail.
+        /// </summary>
+        /// <remarks>Successful rails skip the callback. Exceptions and cancellation propagate.</remarks>
+        public async ValueTask<Rail> TapErrorAsync(Func<Error, ValueTask> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure)
+                await action(rail.Error).ConfigureAwait(false);
+
+            return rail;
+        }
+
+        /// <summary>
         /// Checks another operation on success, preserving the source value, if any, and propagating failure.
         /// </summary>
         public async ValueTask<Rail> CheckAsync(Func<Rail> check)

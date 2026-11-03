@@ -10,6 +10,28 @@ public static class TaskOfTExtensions
     extension<TValue>(Task<RailFor<TValue>> task) where TValue : notnull
     {
         /// <summary>
+        /// Observes the original error on failure after awaiting the source, preserving the rail.
+        /// </summary>
+        public async Task<RailFor<TValue>> TapErrorAsync(Action<Error> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.TapError(action);
+        }
+
+        /// <summary>
+        /// Awaits an error observer on failure, preserving the rail.
+        /// </summary>
+        /// <remarks>Successful rails skip the callback. Exceptions and cancellation propagate.</remarks>
+        public async Task<RailFor<TValue>> TapErrorAsync(Func<Error, Task> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure)
+                await action(rail.Error).ConfigureAwait(false);
+
+            return rail;
+        }
+
+        /// <summary>
         /// Checks another operation on success, preserving the source value, if any, and propagating failure.
         /// </summary>
         public async Task<RailFor<TValue>> CheckAsync(Func<TValue, Rail> check)
