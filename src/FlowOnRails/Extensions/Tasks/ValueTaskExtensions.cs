@@ -10,6 +10,48 @@ public static class ValueTaskExtensions
     extension(ValueTask<Rail> task)
     {
         /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync(Func<Rail> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync(Func<ValueTask<Rail>> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync<TChecked>(Func<RailFor<TChecked>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync<TChecked>(Func<ValueTask<RailFor<TChecked>>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
         /// Matches the rail asynchronously and returns a value based on success or failure.
         /// </summary>
         public async ValueTask<TNext> MatchAsync<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure)

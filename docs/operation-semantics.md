@@ -44,7 +44,7 @@ There is no `Outcome` hierarchy or semantic success object in this development l
 
 `Bind` supports both transitions between rails with and without values. Typed-to-untyped conversion removes the value and preserves the control state and error.
 
-`Check` accepts a callback returning either `Rail` or `RailFor<TChecked>`. Typed sources pass their value to the callback and retain that same value on success. Untyped sources pass no value and continue without one. `Check` is currently synchronous; it does not introduce Task or ValueTask overloads.
+`Check` accepts a callback returning either `Rail` or `RailFor<TChecked>`. Typed sources pass their value to the callback and retain that same value on success. Untyped sources pass no value and continue without one. `CheckAsync` provides the same semantics for Task and ValueTask sources. It accepts synchronous rail callbacks or asynchronous callbacks from the source family. The source and any asynchronous callback are awaited once, and the returned awaitable preserves the source family. No implicit Task-to-ValueTask callback bridge is added.
 
 Without semantic successes, `BindKeepValue` would duplicate `Check`, and `BindKeepSuccess` would duplicate `Bind`. No separate operations with those names are provided. `MapSuccess` does not apply to this model.
 
@@ -90,3 +90,15 @@ m.Map(f).Map(g)           == m.Map(x => g(f(x)))
 ```
 
 Failures absorb happy-path operations without invoking their callbacks. These laws do not imply transactionality, rollback or execution only once across multiple enumerations.
+
+## Internal nullable analysis
+
+`IsSuccess` and `IsFailure` use `MemberNotNullWhen` to tell the compiler that the
+internal `Error` member is non-null on failure. This works even though consumers
+cannot access that member. State validation still runs before returning the
+boolean; attributes describe the contract rather than replacing runtime checks.
+
+`TValue : notnull` and the successful-value constructor check retain the value
+contract. A failed rail's value storage is unused. Public callers continue to use
+`TryUnwrap`, whose conditional output annotations describe both success and
+failure without exposing internal members.

@@ -62,7 +62,15 @@ public RailFor<User> PrepareUser(int id)
 
 The callbacks can return `Rail` or `RailFor<T>`. `Check` is also available on an untyped `Rail`, which continues without a value. Use `Bind` when the next operation's value should replace the current value, `Ensure` for a predicate with a supplied error, and `Tap` for an action without a rail result.
 
-`Check` currently belongs to the synchronous core. Callback exceptions propagate, and uninitialized callback results are rejected.
+`CheckAsync` is available on `Task<Rail>`, `Task<RailFor<T>>`, `ValueTask<Rail>` and `ValueTask<RailFor<T>>`. Callbacks may return a synchronous rail or an awaitable rail from the same asynchronous family as the source. Both rail shapes are accepted, and the source shape and value are preserved.
+
+```csharp
+var result = await GetUserAsync(id)
+    .CheckAsync(user => ValidatePermissionsAsync(user))
+    .CheckAsync(user => ValidateAccount(user));
+```
+
+The source and any asynchronous check are awaited once. Callback exceptions and cancellation propagate; uninitialized callback results are rejected. A failed source skips the callback.
 
 ### Using LINQ
 

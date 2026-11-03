@@ -10,6 +10,48 @@ public static class TaskExtensions
     extension(Task<Rail> task)
     {
         /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync(Func<Rail> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync(Func<Task<Rail>> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync<TChecked>(Func<RailFor<TChecked>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync<TChecked>(Func<Task<RailFor<TChecked>>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
         /// Matches the rail asynchronously and returns a value based on success or failure.
         /// </summary>
         /// <example>

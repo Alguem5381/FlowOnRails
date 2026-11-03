@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `CheckAsync` on Task and ValueTask sources with or without a value. Checks accept synchronous rails or awaitable rails from the source family and preserve the original value on success.
+
+### Changed
+
+- Internal error access is described by `MemberNotNullWhen` on state properties, removing null-forgiving operators after state checks while retaining runtime validation.
+
 ## [0.2.0] - 2026-11-02
 
 ### Added

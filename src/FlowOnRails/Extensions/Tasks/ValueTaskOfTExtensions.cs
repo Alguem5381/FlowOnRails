@@ -10,6 +10,48 @@ public static class ValueTaskOfTExtensions
     extension<TValue>(ValueTask<RailFor<TValue>> task) where TValue : notnull
     {
         /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<RailFor<TValue>> CheckAsync(Func<TValue, Rail> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<RailFor<TValue>> CheckAsync(Func<TValue, ValueTask<Rail>> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check(rail.Value).ConfigureAwait(false);
+            return rail.Check(_ => next);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<RailFor<TValue>> CheckAsync<TChecked>(Func<TValue, RailFor<TChecked>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<RailFor<TValue>> CheckAsync<TChecked>(Func<TValue, ValueTask<RailFor<TChecked>>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check(rail.Value).ConfigureAwait(false);
+            return rail.Check(_ => next);
+        }
+
+        /// <summary>
         /// Matches the rail asynchronously and returns a value based on success or failure.
         /// </summary>
         public async ValueTask<TNext> MatchAsync<TNext>(Func<TValue, TNext> onSuccess, Func<Error, TNext> onFailure)
