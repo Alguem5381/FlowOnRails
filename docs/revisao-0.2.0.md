@@ -26,6 +26,8 @@ A pendência de composição de sucessos ricos em `Combine` deixa de se aplicar.
 
 ## Antes da publicação
 
+O procedimento e a configuração de acesso estão em [Publicação no NuGet](publishing.md). Novas operações e extensões assíncronas de `Check` são possibilidades futuras, não condições para fechar o escopo da 0.2.0.
+
 - [x] Implementar `Check` no núcleo síncrono para executar uma operação falível, preservar o valor anterior em sucesso e propagar o erro em falha. `BindKeepValue` seria redundante sem sucessos semânticos.
 - [ ] Avaliar novas operações e versões assíncronas a partir de usos reais.
 - [ ] Concluir revisão dos comentários XML da API.
@@ -45,3 +47,9 @@ A [issue #2](https://github.com/Alguem5381/FlowOnRails/issues/2) foi fechada com
 ## Adição de Check
 
 Ainda em 02/11/2026, foram adicionadas quatro sobrecargas síncronas de `Check`, cruzando origens e callbacks com ou sem valor. A validação passou com **547 cenários** (76 no projeto original e 471 no consumidor), incluindo 41 novos cenários de preservação do valor, identidade do erro, interrupção, estado não inicializado, exceções e inferência de tipos com method groups.
+
+## Preparação de CI/CD
+
+Os workflows foram revisados para validar `main` e `develop` em Release e publicar somente no evento de release publicada no GitHub. O CD agora executa os testes e confere a tag contra a versão do pacote antes de autenticar. A política existente no NuGet está ativa e corresponde a `Alguem5381/FlowOnRails` e `cd.yml`; não foi necessário criar ou alterar permissões.
+
+A validação local completou restore, build sem avisos, 547 testes e pacote. A issue #1 permanece aberta: ainda falta executar o CI para o código atual no GitHub e confirmar o CD real. Nenhuma release ou versão do pacote foi publicada nesta revisão.
