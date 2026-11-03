@@ -4,6 +4,9 @@
 
 ### Added
 
+- `TapError` and Task/ValueTask `TapErrorAsync` to observe the original error on failure while preserving the rail. Asynchronous observers are awaited.
+- Lazy `Ensure` / `EnsureAsync` error-factory overloads, allowing errors to include the current value and creating them only when the predicate fails.
+
 - `CheckAsync` on Task and ValueTask sources with or without a value. Checks accept synchronous rails or awaitable rails from the source family and preserve the original value on success.
 
 ### Changed

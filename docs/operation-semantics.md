@@ -35,6 +35,8 @@ There is no `Outcome` hierarchy or semantic success object in this development l
 | `Bind` | Invoke once and return its valid rail, including a new failure | Skip callback; preserve error |
 | `Check` | Invoke once; preserve source on success, discard callback value, or return its original error on failure | Skip callback; preserve source |
 | `Ensure` | Invoke predicate once; preserve source when true, fail with supplied error when false | Skip predicate; preserve source |
+| `Ensure(predicate, errorFactory)` | Invoke predicate once; if false, create the error once using the current value (no argument for untyped rails) | Skip both callbacks; preserve source |
+| `TapError` | Skip action; preserve source | Invoke action once with the original error; preserve source |
 | `Tap` | Invoke action once; preserve source | Skip action; preserve source |
 | `TapIf(bool, action)` | Invoke action once only when condition is true | Skip action; preserve source |
 | `TapIf(predicate, action)` | Invoke predicate once; invoke action only when true; preserve source | Skip both; preserve source |
@@ -50,6 +52,15 @@ Without semantic successes, `BindKeepValue` would duplicate `Check`, and `BindKe
 
 The untyped rail has no value-producing `Recover`; use `RecoverWith` with a fallback returning `Rail`. There is no automatic exception handling: callback exceptions propagate. Domain errors model explicit failures.
 
+`Ensure` error factories are lazy: they run only after a successful source fails
+its predicate. Typed predicates and factories receive the same source value.
+Null factory results are rejected by the failure constructor. Factory and
+predicate exceptions propagate. The existing preconstructed-error overload keeps
+its behavior.
+
+`TapError` observes a failure without changing its value/error state or replacing
+the error object. It does not recover failures; observer exceptions propagate.
+
 ## Asynchronous boundaries
 
 - Task extensions return `Task`; ValueTask extensions return `ValueTask`.
@@ -57,6 +68,7 @@ The untyped rail has no value-producing `Recover`; use `RecoverWith` with a fall
 - ValueTask sources and callback results are consumed once, including sources backed by `IValueTaskSource<T>`.
 - Callbacks use the same asynchronous family as their source. The existing typed Task-to-ValueTask binding bridge is named `BindValueTaskAsync` and returns `Task`, avoiding ambiguity for `BindAsync(async ...)` lambdas.
 - `RecoverAsync` produces a replacement value for a typed rail. `RecoverWithAsync` returns a fallback rail for either shape.
+- `EnsureAsync` awaits its source before applying the synchronous predicate and error factory. `TapErrorAsync` supports synchronous observers and same-family asynchronous observers; failure observers are awaited before returning the original rail.
 - Task exceptions and cancellation propagate; they are not converted into `Error`.
 - Converting families requires an explicit boundary. A mismatched awaitable can otherwise be wrapped as a mapped value or discarded by an `Action`; keep compiler warnings enabled.
 

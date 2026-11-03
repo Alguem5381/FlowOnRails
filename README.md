@@ -138,6 +138,40 @@ Migration from the previous signatures:
 - The two `BindAsync` overloads on `Task<RailFor<T>>` that accepted ValueTask callbacks are now named `BindValueTaskAsync`. Ordinary Task callbacks and `async` lambdas continue to use `BindAsync` without ambiguous overloads.
 - When mixing other callback types, convert explicitly at the boundary. A synchronous `MapAsync` overload can wrap an awaitable as a value, and an expression passed as `Action` can discard a returned awaitable. Keep compiler warnings enabled.
 
+### Contextual validation and error observation
+
+Pass an error factory to `Ensure` when the failure should include data from the
+current value:
+
+```csharp
+var result = Rail.Ok(user)
+    .Ensure(user => user.IsActive, user => new InactiveUserError(user.Id))
+    .TapError(error => Console.WriteLine(error));
+```
+
+The predicate runs only on success. The factory receives the same value and runs
+only when the predicate returns `false`. An existing failure skips both callbacks.
+The overload taking an already-created error remains available. Untyped `Rail`
+accepts a parameterless factory: `rail.Ensure(() => condition, () => new DomainError("Rejected"))`.
+Factories must return a non-null error; callback exceptions propagate.
+
+`TapError` observes the original error exactly once on failure and returns the
+original rail. Successful rails skip the observer. An observer exception
+propagates rather than replacing the domain error.
+
+Task and ValueTask sources provide `EnsureAsync` with the same synchronous
+predicate and error factory, and `TapErrorAsync` with a synchronous observer or an
+asynchronous observer from the source family:
+
+```csharp
+var result = await GetUserAsync(id)
+    .EnsureAsync(user => user.IsActive, user => new InactiveUserError(user.Id))
+    .TapErrorAsync(error => AuditFailureAsync(error));
+```
+
+Asynchronous observers are awaited before the pipeline continues. Each operation
+preserves the source family, and exceptions and cancellation propagate.
+
 ### Recovery
 
 Use `Recover` on `RailFor<T>` to produce a replacement value. Use `RecoverWith` to run a fallback that returns another rail, which may itself fail:
