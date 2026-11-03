@@ -12,6 +12,7 @@
     <File Path="FlowOnRails.slnx" />
     <File Path="LICENSE" />
     <File Path="README.md" />
+    <File Path="CHANGELOG.md" />
   </Folder>
   <Folder Name="/Solution Items/Workflows/">
     <File Path=".github\workflows\cd.yml" />

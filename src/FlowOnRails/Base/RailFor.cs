@@ -33,7 +33,7 @@ public readonly partial struct RailFor<TValue> : IEquatable<RailFor<TValue>> whe
     /// <summary>
     /// Gets the value associated with a successful rail.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown if accessed on a failed rail.</exception>
+    /// <remarks>Only meaningful after validating that the rail is successful; unused on failure.</remarks>
     internal TValue Value { get; }
 
     private RailFor(bool isSuccess, Error? error, TValue? value)
