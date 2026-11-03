@@ -42,6 +42,20 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
                 : Fail(error);
 
     /// <summary>
+    /// Ensures the predicate holds, creating an error only when a successful rail fails the predicate.
+    /// </summary>
+    /// <remarks>Existing failures skip both callbacks. A null produced error is rejected; callback exceptions propagate.</remarks>
+    public RailFor<TValue> Ensure(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+    {
+        if (IsFailure)
+            return this;
+
+        return predicate(Value)
+            ? this
+            : Fail(errorFactory(Value));
+    }
+
+    /// <summary>
     /// Executes the given action if the rail is successful, passing the value.
     /// </summary>
     /// <param name="tap">The action to execute.</param>

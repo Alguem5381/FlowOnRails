@@ -10,6 +10,15 @@ public static class TaskOfTExtensions
     extension<TValue>(Task<RailFor<TValue>> task) where TValue : notnull
     {
         /// <summary>
+        /// Awaits the source and creates an error only if the predicate fails on success.
+        /// </summary>
+        public async Task<RailFor<TValue>> EnsureAsync(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Ensure(predicate, errorFactory);
+        }
+
+        /// <summary>
         /// Observes the original error on failure after awaiting the source, preserving the rail.
         /// </summary>
         public async Task<RailFor<TValue>> TapErrorAsync(Action<Error> action)

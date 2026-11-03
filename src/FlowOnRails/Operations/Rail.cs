@@ -125,6 +125,20 @@ public readonly partial struct Rail
     }
 
     /// <summary>
+    /// Ensures the predicate holds, creating an error only when a successful rail fails the predicate.
+    /// </summary>
+    /// <remarks>Existing failures skip both callbacks. A null produced error is rejected; callback exceptions propagate.</remarks>
+    public Rail Ensure(Func<bool> predicate, Func<Error> errorFactory)
+    {
+        if (IsFailure)
+            return this;
+
+        return predicate()
+            ? this
+            : Fail(errorFactory());
+    }
+
+    /// <summary>
     /// Matches the rail and returns a value based on success or failure.
     /// </summary>
     /// <typeparam name="TNext">The return type.</typeparam>
