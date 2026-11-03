@@ -28,10 +28,12 @@
 
   <Folder Name="/src/">
     <Project Path="src/FlowOnRails/FlowOnRails.csproj" />
+    <Project Path="src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
     <Project Path="tests/FlowOnRails.Tests/FlowOnRails.Tests.csproj" />
+    <Project Path="tests/FlowOnRails.AspNetCore.Tests/FlowOnRails.AspNetCore.Tests.csproj" />
     <Project Path="tests/FlowOnRails.PublicApi.Tests/FlowOnRails.PublicApi.Tests.csproj" />
   </Folder>
 </Solution>
