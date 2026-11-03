@@ -27,7 +27,7 @@ public static class ValueTaskOfTExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var next = await bind(rail.Value).ConfigureAwait(false);
             return rail.Bind(_ => next);
@@ -40,7 +40,7 @@ public static class ValueTaskOfTExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return Rail.Fail(rail.Error!);
+                return Rail.Fail(rail.Error);
 
             var next = await bind(rail.Value).ConfigureAwait(false);
             return rail.Bind(_ => next);
@@ -62,7 +62,7 @@ public static class ValueTaskOfTExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var value = await map(rail.Value).ConfigureAwait(false);
             return rail.Map(_ => value);
@@ -134,7 +134,7 @@ public static class ValueTaskOfTExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var value = await recover(rail.Error!).ConfigureAwait(false);
+            var value = await recover(rail.Error).ConfigureAwait(false);
             return rail.Recover(_ => value);
         }
 
@@ -147,7 +147,7 @@ public static class ValueTaskOfTExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var next = await fallback(rail.Error!).ConfigureAwait(false);
+            var next = await fallback(rail.Error).ConfigureAwait(false);
             return rail.RecoverWith(_ => next);
         }
 
@@ -169,7 +169,7 @@ public static class ValueTaskOfTExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var error = await errorMapper(rail.Error!).ConfigureAwait(false);
+            var error = await errorMapper(rail.Error).ConfigureAwait(false);
             return rail.MapError(_ => error);
         }
     }

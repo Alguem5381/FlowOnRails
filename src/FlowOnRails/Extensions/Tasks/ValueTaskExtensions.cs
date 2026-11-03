@@ -40,7 +40,7 @@ public static class ValueTaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var next = await bind().ConfigureAwait(false);
             return rail.Bind(() => next);
@@ -103,7 +103,7 @@ public static class ValueTaskExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var next = await fallback(rail.Error!).ConfigureAwait(false);
+            var next = await fallback(rail.Error).ConfigureAwait(false);
             return rail.RecoverWith(_ => next);
         }
 
@@ -123,7 +123,7 @@ public static class ValueTaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var value = await map().ConfigureAwait(false);
             return rail.Map(() => value);
@@ -147,7 +147,7 @@ public static class ValueTaskExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var error = await errorMapper(rail.Error!).ConfigureAwait(false);
+            var error = await errorMapper(rail.Error).ConfigureAwait(false);
             return rail.MapError(_ => error);
         }
     }

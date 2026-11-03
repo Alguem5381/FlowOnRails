@@ -27,7 +27,7 @@ public static class LinqExtensions
             foreach (var rail in results)
             {
                 if (rail.IsFailure)
-                    return RailFor<IReadOnlyList<T>>.Fail(rail.Error!);
+                    return RailFor<IReadOnlyList<T>>.Fail(rail.Error);
 
                 list.Add(rail.Value);
             }
@@ -54,7 +54,7 @@ public static class LinqExtensions
         public IEnumerable<Error> SelectErrors() =>
             from rail in results
             where rail.IsFailure
-            select rail.Error!;
+            select rail.Error;
 
         /// <summary>
         /// Partitions the sequence of results into a tuple containing a list of successful values and a list of errors.
@@ -68,7 +68,7 @@ public static class LinqExtensions
                 if (rail.IsSuccess)
                     oks.Add(rail.Value);
                 else
-                    errors.Add(rail.Error!);
+                    errors.Add(rail.Error);
 
             return (oks, errors);
         }

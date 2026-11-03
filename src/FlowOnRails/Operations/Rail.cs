@@ -20,7 +20,7 @@ public readonly partial struct Rail
     public bool TryUnwrap([NotNullWhen(false)] out Error? error)
     {
         var isSuccess = IsSuccess;
-        error = Error!;
+        error = Error;
         return isSuccess;
     }
 
@@ -72,7 +72,7 @@ public readonly partial struct Rail
         if (IsSuccess)
             return this;
 
-        var next = fallback(Error!);
+        var next = fallback(Error);
         _ = next.IsSuccess;
         return next;
     }
@@ -129,7 +129,7 @@ public readonly partial struct Rail
     public TNext Match<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure) =>
         IsSuccess
             ? onSuccess()
-            : onFailure(Error!);
+            : onFailure(Error);
 
     /// <summary>
     /// Binds the rail to another rail that returns a value using the given function if successful.
@@ -137,7 +137,7 @@ public readonly partial struct Rail
     public RailFor<TNext> Bind<TNext>(Func<RailFor<TNext>> bind) where TNext : notnull
     {
         if (IsFailure)
-            return RailFor<TNext>.Fail(Error!);
+            return RailFor<TNext>.Fail(Error);
 
         var next = bind();
         _ = next.IsSuccess;
@@ -167,7 +167,7 @@ public readonly partial struct Rail
     public RailFor<TNext> Map<TNext>(Func<TNext> map) where TNext : notnull =>
         IsSuccess
             ? RailFor<TNext>.CreateSuccess(map())
-            : RailFor<TNext>.Fail(Error!);
+            : RailFor<TNext>.Fail(Error);
 
     /// <summary>
     /// Maps the error of a failed rail to another error synchronously.
@@ -175,5 +175,5 @@ public readonly partial struct Rail
     public Rail MapError(Func<Error, Error> errorMapper) =>
         IsSuccess
             ? this
-            : Fail(errorMapper(Error!));
+            : Fail(errorMapper(Error));
 }

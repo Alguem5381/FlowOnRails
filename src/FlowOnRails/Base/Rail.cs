@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace FlowOnRails;
 
 /// <summary>
@@ -10,18 +12,20 @@ public readonly partial struct Rail : IEquatable<Rail>
     /// <summary>
     /// Gets a value indicating whether the operation was successful.
     /// </summary>
+    [MemberNotNullWhen(false, nameof(Error))]
     public bool IsSuccess
     {
         get
         {
             RailState.EnsureInitialized(field, _error);
-            return field;
+            return Error is null;
         }
     }
 
     /// <summary>
     /// Gets a value indicating whether the operation failed.
     /// </summary>
+    [MemberNotNullWhen(true, nameof(Error))]
     public bool IsFailure => !IsSuccess;
 
     /// <summary>
