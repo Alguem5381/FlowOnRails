@@ -23,11 +23,17 @@ public class VisibilityScope
         Select(typeof(TError), ErrorRange.Tree);
 
     /// <summary>Select descendants without selecting their root.</summary>
-    public VisibilitySelection ForDescendantsOf<TError>() where TError : Error =>
+    public VisibilitySelection
+        ForDescendantsOf<TError>()
+        where TError : Error =>
         Select(typeof(TError), ErrorRange.Descendants);
 
     /// <summary>Configure a block bounded by this error type and its descendants.</summary>
-    public void ForTree<TError>(Action<VisibilityTree> configure) where TError : Error =>
+    public void
+        ForTree<TError>(
+            Action<VisibilityTree> configure
+        )
+        where TError : Error =>
         ConfigureTree(typeof(TError), ErrorRange.Tree, configure);
 
     /// <summary>Configure a block bounded by the descendants, excluding the root.</summary>
@@ -49,7 +55,12 @@ public class VisibilityScope
         return new VisibilitySelection(rule);
     }
 
-    private void ConfigureTree(Type root, ErrorRange range, Action<VisibilityTree> configure)
+    private void
+        ConfigureTree(
+            Type root,
+            ErrorRange range,
+            Action<VisibilityTree> configure
+        )
     {
         ArgumentNullException.ThrowIfNull(configure);
 

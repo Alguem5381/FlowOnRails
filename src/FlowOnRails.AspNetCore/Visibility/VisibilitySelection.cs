@@ -8,13 +8,14 @@ public sealed class VisibilitySelection
     internal VisibilitySelection(VisibilityRule rule) => _rule = rule;
 
     /// <summary>Permit each selected type's own translation contract.</summary>
-    public void TranslateEachType() => _rule.SetBehavior(VisibilityBehavior.TranslateEachType);
+    public void TranslateEachType() =>
+        _rule.SetBehavior(VisibilityBehavior.TranslateEachType);
 
     /// <summary>Use the generic response for the selected errors.</summary>
-    public void UseGenericProblem() => _rule.SetBehavior(VisibilityBehavior.GenericProblem);
+    public void UseGenericProblem() =>
+        _rule.SetBehavior(VisibilityBehavior.GenericProblem);
 
     /// <summary>Search outside the selection for an authorized ancestor translation contract.</summary>
-    public void
-        UseNearestAncestorMapping(
-        ) => _rule.SetBehavior(VisibilityBehavior.NearestAncestorMapping);
+    public void UseNearestAncestorMapping() =>
+        _rule.SetBehavior(VisibilityBehavior.NearestAncestorMapping);
 }

@@ -22,7 +22,8 @@ public sealed class VisibilityTree : VisibilityScope
     public void UseGenericProblem() => Behavior.UseGenericProblem();
 
     /// <summary>Search above this block for an authorized ancestor contract.</summary>
-    public void UseNearestAncestorMapping() => Behavior.UseNearestAncestorMapping();
+    public void UseNearestAncestorMapping() =>
+        Behavior.UseNearestAncestorMapping();
 
     private VisibilitySelection Behavior
     {

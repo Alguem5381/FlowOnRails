@@ -11,7 +11,10 @@ public static class VisibilityServiceCollectionExtensions
         /// Configure and validate a singleton visibility snapshot. This does not register HTTP
         /// translators, exception handlers, or ProblemDetails writers. Register visibility once.
         /// </summary>
-        public IServiceCollection AddFlowOnRailsVisibility(Action<VisibilityBuilder> configure)
+        public IServiceCollection
+            AddFlowOnRailsVisibility(
+                Action<VisibilityBuilder> configure
+            )
         {
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(configure);
