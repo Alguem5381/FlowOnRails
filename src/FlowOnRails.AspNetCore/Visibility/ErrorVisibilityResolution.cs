@@ -16,6 +16,6 @@ public sealed class ErrorVisibilityResolution
     internal ErrorVisibilityResolution(ErrorVisibilityBehavior behavior, IEnumerable<Type> candidates)
     {
         Behavior = behavior;
-        TranslationCandidates = Array.AsReadOnly(candidates.ToArray());
+        TranslationCandidates = Array.AsReadOnly([.. candidates]);
     }
 }

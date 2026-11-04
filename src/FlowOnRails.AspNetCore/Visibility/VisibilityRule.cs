@@ -29,7 +29,9 @@ internal sealed class VisibilityRule(ErrorSelection selection, Type? controllerT
     internal void SetBehavior(ErrorVisibilityBehavior behavior)
     {
         if (Behavior is { } existing && existing != behavior)
-            throw new InvalidOperationException($"Conflicting visibility behaviors for '{Selection.Root}' ({Selection.Range}).");
+            throw new InvalidOperationException(
+                $"Conflicting visibility behaviors for '{Selection.Root}' ({Selection.Range}).");
+
         Behavior = behavior;
     }
 

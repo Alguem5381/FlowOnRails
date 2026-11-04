@@ -17,27 +17,45 @@ public sealed class ErrorVisibilityPolicy
     public ErrorVisibilityResolution Resolve(Type errorType, Type? controllerType = null)
     {
         ArgumentNullException.ThrowIfNull(errorType);
+
         if (!typeof(Error).IsAssignableFrom(errorType) || errorType.ContainsGenericParameters)
             throw new ArgumentException("A closed type derived from Error is required.", nameof(errorType));
-        if (controllerType is not null) ValidateController(controllerType);
+
+        if (controllerType is not null)
+            ValidateController(controllerType);
 
         var effectiveRule = FindRule(errorType, controllerType);
         var behavior = effectiveRule?.Behavior ?? ErrorVisibilityBehavior.GenericProblem;
-        if (behavior == ErrorVisibilityBehavior.GenericProblem)
-            return new(behavior, []);
-        if (behavior == ErrorVisibilityBehavior.TranslateEachType)
-            return new(behavior, [errorType]);
+
+        switch (behavior)
+        {
+            case ErrorVisibilityBehavior.GenericProblem:
+                return new(behavior, []);
+            case ErrorVisibilityBehavior.TranslateEachType:
+                return new(behavior, [errorType]);
+        }
 
         var candidates = new List<Type>();
-        for (var ancestor = errorType.BaseType; ancestor is not null && typeof(Error).IsAssignableFrom(ancestor); ancestor = ancestor.BaseType)
+
+        for (
+            var ancestor = errorType.BaseType;
+            ancestor is not null && typeof(Error).IsAssignableFrom(ancestor);
+            ancestor = ancestor.BaseType
+        )
         {
             var rule = FindRule(ancestor, controllerType);
             // An explicit generic response is a boundary; an unconfigured ancestor is not.
-            if (rule?.Behavior == ErrorVisibilityBehavior.GenericProblem) break;
-            if (effectiveRule is not null && effectiveRule.Selection.Matches(ancestor)) continue;
-            if (rule?.Behavior == ErrorVisibilityBehavior.TranslateEachType) candidates.Add(ancestor);
+            if (rule?.Behavior == ErrorVisibilityBehavior.GenericProblem)
+                break;
+
+            if (effectiveRule is not null && effectiveRule.Selection.Matches(ancestor))
+                continue;
+
+            if (rule?.Behavior == ErrorVisibilityBehavior.TranslateEachType)
+                candidates.Add(ancestor);
         }
-        return new(behavior, candidates);
+
+        return new ErrorVisibilityResolution(behavior, candidates);
     }
 
     /// <summary>
@@ -48,31 +66,40 @@ public sealed class ErrorVisibilityPolicy
     {
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(httpContext);
+
         var controllerType = httpContext.GetEndpoint()?.Metadata
             .GetMetadata<ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
+
         return Resolve(error.GetType(), controllerType);
     }
 
     private VisibilityRule? FindRule(Type errorType, Type? controllerType)
     {
-        if (controllerType is not null)
-        {
-            var local = FindInScope(errorType, controllerType);
-            if (local is not null) return local;
-        }
-        return FindInScope(errorType, null);
+        if (controllerType is null)
+            return FindInScope(errorType, null);
+
+        var local = FindInScope(errorType, controllerType);
+
+        return local ?? FindInScope(errorType, null);
     }
 
     private VisibilityRule? FindInScope(Type errorType, Type? controllerType)
     {
-        for (var ancestor = errorType; ancestor is not null && typeof(Error).IsAssignableFrom(ancestor); ancestor = ancestor.BaseType)
+        for (var ancestor = errorType;
+             ancestor is not null && typeof(Error).IsAssignableFrom(ancestor);
+             ancestor = ancestor.BaseType)
         {
             var match = _rules
-                .Where(rule => rule.ControllerType == controllerType && rule.Selection.Root == ancestor && rule.Selection.Matches(errorType))
+                .Where(rule => rule.ControllerType == controllerType &&
+                               rule.Selection.Root == ancestor &&
+                               rule.Selection.Matches(errorType))
                 .OrderBy(rule => rule.Selection.Range)
                 .FirstOrDefault();
-            if (match is not null) return match;
+
+            if (match is not null)
+                return match;
         }
+
         return null;
     }
 

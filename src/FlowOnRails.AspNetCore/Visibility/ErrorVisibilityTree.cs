@@ -6,7 +6,6 @@ public sealed class ErrorVisibilityTree : ErrorVisibilityRules
     private readonly List<VisibilityRule> _rules;
     private readonly Type? _controllerType;
     private readonly ErrorSelection _selection;
-    private ErrorVisibilitySelection? _behavior;
 
     internal ErrorVisibilityTree(List<VisibilityRule> rules, Type? controllerType, ErrorSelection selection)
         : base(rules, controllerType, selection)
@@ -29,10 +28,14 @@ public sealed class ErrorVisibilityTree : ErrorVisibilityRules
     {
         get
         {
-            if (_behavior is not null) return _behavior;
+            if (field is not null)
+                return field;
+
             var rule = new VisibilityRule(_selection, _controllerType);
+
             _rules.Add(rule);
-            return _behavior = new ErrorVisibilitySelection(rule);
+
+            return field = new ErrorVisibilitySelection(rule);
         }
     }
 }

@@ -4,6 +4,7 @@ namespace FlowOnRails.AspNetCore.Visibility;
 public sealed class ErrorVisibilitySelection
 {
     private readonly VisibilityRule _rule;
+
     internal ErrorVisibilitySelection(VisibilityRule rule) => _rule = rule;
 
     /// <summary>Permit each selected type's own translation contract.</summary>
