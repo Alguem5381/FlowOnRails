@@ -23,7 +23,21 @@ public sealed class VisibilityPolicy
     /// Resolve a closed error type. Exact controller rules precede global rules; within a scope,
     /// the nearest error root wins, with exact, descendants-only, then tree rules breaking ties.
     /// </summary>
-    public VisibilityResolution Resolve(Type errorType, Type? controllerType = null)
+    public VisibilityResolution
+        Resolve(
+            Type errorType,
+            Type? controllerType = null
+        ) =>
+        Resolve(errorType, controllerType, []);
+
+    internal VisibilityIndex GlobalIndex => _global;
+
+    private VisibilityResolution
+        Resolve(
+            Type errorType,
+            Type? controllerType,
+            IReadOnlyList<VisibilityMetadata> endpointScopes
+        )
     {
         ArgumentNullException.ThrowIfNull(errorType);
 
@@ -33,7 +47,7 @@ public sealed class VisibilityPolicy
         if (controllerType is not null)
             ValidateController(controllerType);
 
-        var effectiveRule = FindRule(errorType, controllerType);
+        var effectiveRule = FindRule(errorType, controllerType, endpointScopes);
         var behavior = effectiveRule?.Behavior ?? VisibilityBehavior.GenericProblem;
 
         switch (behavior)
@@ -52,7 +66,7 @@ public sealed class VisibilityPolicy
             ancestor = ancestor.BaseType
         )
         {
-            var rule = FindRule(ancestor, controllerType);
+            var rule = FindRule(ancestor, controllerType, endpointScopes);
             // An explicit generic response is a boundary; an unconfigured ancestor is not.
             if (rule?.Behavior == VisibilityBehavior.GenericProblem)
                 break;
@@ -69,25 +83,45 @@ public sealed class VisibilityPolicy
 
     /// <summary>
     /// Resolve an error using the current endpoint's controller metadata.
-    /// Endpoints without controller metadata use global rules. No controller instance is created.
+    /// Endpoint and route-group rules precede controller and global rules. No controller instance is created.
     /// </summary>
-    public VisibilityResolution ResolveForRequest(Error error, HttpContext httpContext)
+    public VisibilityResolution
+        ResolveForRequest(
+            Error error,
+            HttpContext httpContext
+        )
     {
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        var controllerType = httpContext.GetEndpoint()?.Metadata
+        var endpoint = httpContext.GetEndpoint();
+        var controllerType = endpoint?.Metadata
             .GetMetadata<ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
+        var endpointScopes = endpoint?.Metadata.GetOrderedMetadata<VisibilityMetadata>() ?? [];
 
-        return Resolve(error.GetType(), controllerType);
+        return Resolve(error.GetType(), controllerType, endpointScopes);
     }
 
     private VisibilityRule?
         FindRule(
             Type errorType,
-            Type? controllerType
+            Type? controllerType,
+            IReadOnlyList<VisibilityMetadata> endpointScopes
         )
     {
+        // Endpoint metadata is ordered outer group, inner groups, then endpoint.
+        for (
+            var index = endpointScopes.Count - 1;
+            index >= 0;
+            index--
+        )
+        {
+            var match = endpointScopes[index].Index.FindRule(errorType);
+
+            if (match is not null)
+                return match;
+        }
+
         if (controllerType is not null &&
             _controllers.TryGetValue(controllerType, out var controller))
         {
