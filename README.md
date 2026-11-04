@@ -202,7 +202,8 @@ See [operation semantics](https://github.com/Alguem5381/FlowOnRails/blob/main/do
 ## ASP.NET Core integration in development
 
 The separate `FlowOnRails.AspNetCore` project now contains an error visibility
-policy with global and controller-specific rules. HTTP translation, response
+policy with explicit global, controller, endpoint and route-group rules, backed
+by immutable indexes. HTTP translation, response
 helpers and generator/analyzer support are planned. This project is not yet a
 published package. See the [visibility design](docs/design/aspnetcore-visibility.md).
 

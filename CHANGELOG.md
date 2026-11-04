@@ -4,6 +4,8 @@
 
 ### Added
 
+- `WithErrorVisibility` for Minimal API endpoints and nested route groups, with endpoint-to-global precedence and independent immutable configuration snapshots.
+
 - Initial `FlowOnRails.AspNetCore` project with tree-based error visibility, ancestor projection candidates, exact-controller overrides, validated immutable configuration and ASP.NET endpoint metadata integration. HTTP translation and package publication are deferred.
 
 - `TapError` and Task/ValueTask `TapErrorAsync` to observe the original error on failure while preserving the rail. Asynchronous observers are awaited.
@@ -12,6 +14,9 @@
 - `CheckAsync` on Task and ValueTask sources with or without a value. Checks accept synchronous rails or awaitable rails from the source family and preserve the original value on success.
 
 ### Changed
+
+- Simplified the unpublished ASP.NET visibility API to `Visibility*` names and explicit `builder.Global` configuration. Selection and conflict checks now use explicit cases rather than enum ordering.
+- Visibility resolution uses frozen indexes by scope and error root, avoiding full rule scans and sorting during requests.
 
 - Internal error access is described by `MemberNotNullWhen` on state properties, removing null-forgiving operators after state checks while retaining runtime validation.
 

@@ -1,25 +1,20 @@
 # ASP.NET Core error visibility
 
-Status: implemented foundation, not yet a published package (2026-11-03).
+Status: implemented foundation, not yet a published package (updated 2026-11-04).
 
-`FlowOnRails.AspNetCore` is a separate project in this solution. The base library
-has no ASP.NET dependency. The satellite currently implements visibility only:
-no HTTP status mapping, property projection, ProblemDetails writing, endpoint
-success helpers, source generator, analyzer, or OpenAPI support is implemented.
+`FlowOnRails.AspNetCore` is separate from the base library. It selects which error
+contracts may be considered for HTTP translation. Status mappings, property
+projection, ProblemDetails writing, success response helpers, source generators,
+compile-time analyzers and OpenAPI support are not implemented yet.
 
-## Separate selection, visibility, and translation
-
-Visibility answers which error contract may be considered for translation. HTTP
-mapping answers how that contract becomes a response, including omitted properties.
-A visible contract without an HTTP mapping must ultimately use the generic response.
-Visibility does not promise that arbitrary values stored in properties are safe.
+## Configure global and controller scopes
 
 ```csharp
 using FlowOnRails.AspNetCore.Visibility;
 
-builder.Services.AddFlowOnRailsVisibility(errors =>
+builder.Services.AddFlowOnRailsVisibility(visibility =>
 {
-    errors.ForTree<PublicError>(tree =>
+    visibility.Global.ForTree<PublicError>(tree =>
     {
         tree.TranslateEachType();
 
@@ -30,7 +25,7 @@ builder.Services.AddFlowOnRailsVisibility(errors =>
             .UseGenericProblem();
     });
 
-    errors.ForController<UsersController>(controller =>
+    visibility.ForController<UsersController>(controller =>
     {
         controller.ForTree<NotFoundError>()
             .UseGenericProblem();
@@ -38,126 +33,175 @@ builder.Services.AddFlowOnRailsVisibility(errors =>
 });
 ```
 
-Here `PublicError` includes both `NotFoundError` and `InternalError` families.
-The first rule authorizes concrete contracts throughout the public family.
-The descendants of `NotFoundError` instead search for a translation starting with
-`NotFoundError` itself. A translator for that ancestor must project its contract,
-never the concrete descendant's extra properties. `InternalError` and its entire
-family require the generic response. In `UsersController`, the whole not-found
-family requires the generic response instead of using the global behavior.
+`PublicError` includes the `NotFoundError` and `InternalError` families in this
+example. The public family permits concrete contracts; not-found descendants
+instead use ancestor contracts beginning with `NotFoundError`. The internal
+family requires a generic response. `UsersController` overrides the not-found
+family to require a generic response too.
 
-These rules intentionally use class inheritance, not type-name conventions.
-Nothing assumes that a type named `NotFoundError` maps to 404.
+`VisibilityBuilder` organizes configuration and builds the policy. It has a
+`Global` scope instead of inheriting selector methods. Controller callbacks also
+receive a `VisibilityScope`. A `VisibilityTree` is a bounded specialization of
+that scope and adds a default behavior for the selected tree; it still supports
+narrower selections without duplicating the selector implementation.
 
-## Selection ranges
+## Select a type or family
 
 | Selection | Selected set |
 |---|---|
 | `For<T>()` | Exactly T |
-| `ForDescendantsOf<T>()` | All descendants, excluding T |
+| `ForDescendantsOf<T>()` | Descendants, excluding T |
 | `ForTree<T>()` | T and all descendants |
 
-Tree and descendants selections also accept a configuration block. Blocks limit
-all nested selections to their range; they do not change resolution priority.
-A block can merely organize narrower rules without assigning a behavior to its root.
-Empty blocks have no effect; creating a terminal selection without assigning a
-behavior is a configuration error. Descendants-only blocks cannot select their
-own excluded root. Unrelated selections are rejected.
+Tree and descendants selections also accept configuration blocks. A block bounds
+its nested selections; it does not add another precedence level. Blocks may
+organize narrower rules without assigning a default behavior. Selecting an
+unrelated type or including a descendants-only block's root is rejected.
+Empty organizational blocks have no effect. A terminal selection without a
+behavior is a configuration error.
 
-## Behaviors and ancestor lookup
+## Choose a behavior
 
-| Behavior | Authorized translation candidates |
+| Behavior | Authorized projection contracts |
 |---|---|
 | `TranslateEachType()` | Only the concrete error type |
-| `UseGenericProblem()` | None; resolution ends |
+| `UseGenericProblem()` | None; stop resolution |
 | `UseNearestAncestorMapping()` | Authorized ancestors outside the selected range, nearest first |
 
-For ancestor lookup, an authorized ancestor has effective `TranslateEachType`
-visibility. Unconfigured ancestors are skipped. Ancestors with ancestor-lookup
-behavior do not authorize their own contracts. An explicit generic-response rule
-on an ancestor stops the search, including access to contracts above that boundary.
-Already collected nearer candidates remain available.
+An ancestor is authorized when its effective behavior is `TranslateEachType`.
+Unconfigured ancestors are skipped; ancestor-lookup behavior does not authorize
+its own contract. An explicitly generic ancestor stops lookup above that boundary.
+Nearer candidates already collected remain available.
 
-The selected range determines where ancestor contracts may start:
+The effective selection for the original error bounds candidate lookup:
 
-- `For<T>()`: search from T's parent.
-- `ForDescendantsOf<T>()`: exclude descendant contracts; T can be the first candidate.
-- `ForTree<T>()`: exclude the entire selected tree; search above T.
+- `For<T>()`: begin at T's parent.
+- `ForDescendantsOf<T>()`: exclude descendant contracts; T may be the first candidate.
+- `ForTree<T>()`: exclude all contracts in T's tree; begin above T.
 
-A narrower explicit rule may give an individual type its own translation. This
-does not make that type a candidate for other errors whose effective ancestor
-rule excludes the whole tree. The ancestor search is bounded by the effective
-selection for the original error.
+A narrower own-translation rule can authorize an individual type. It does not
+make that type available to another error whose effective rule excludes that
+whole tree from ancestor candidates.
 
-`Resolve` returns an `ErrorVisibilityResolution` with the effective behavior and
-an immutable ordered `TranslationCandidates` list. It does not check mapping
-existence. The future translator must choose the first candidate with an actual
-HTTP mapping. If the list is empty or no candidate has a mapping, it must use the
-generic response. The planned default is a generic 500 ProblemDetails without
-error properties; this core does not write that response yet.
+Visibility returns a `VisibilityResolution`, containing `Behavior` and an
+immutable `TranslationCandidates` list. It does not check whether mappings exist.
+The future translator must use the first candidate with a mapping, projecting
+that candidate's contract, never additional concrete-descendant properties.
+If no candidate or mapping exists, the translator must use the generic response.
+The planned default is a generic 500 ProblemDetails, but visibility itself writes
+no HTTP response. Nothing infers status codes from names such as `NotFoundError`.
 
-## Deterministic precedence
+Property selection is a separate mapping concern. Allowing a contract does not
+guarantee that arbitrary objects stored in its properties are safe to expose.
 
-1. Search rules for the exact selected controller class.
-2. If none match the error, search global rules.
-3. Within that scope, the nearest matching error ancestor wins.
-4. At the same root: exact type, descendants-only, then whole tree.
+## Minimal APIs: endpoint and route-group scopes
 
-Registration order has no effect. No matching rule means generic. Controller
-configuration is an explicit override: even a broad local rule takes precedence
-over a more specific global rule. It can authorize a globally excluded family.
-Ancestor resolution uses the same controller scope and global fallback for each
-ancestor candidate.
+```csharp
+var users = app.MapGroup("/users")
+    .WithErrorVisibility(scope =>
+    {
+        scope.ForDescendantsOf<NotFoundError>()
+            .UseNearestAncestorMapping();
+    });
 
-Controller rules are exact: a configured base controller does not grant permission
-to subclasses automatically. Other controllers remain isolated. Configuration
-accepts controller classes without requiring inheritance from `ControllerBase`.
-There are no per-action rules or controller-family rules in this first version.
+users.MapGet("/{id}", GetUser)
+    .WithErrorVisibility(scope =>
+    {
+        scope.ForTree<InternalError>()
+            .UseGenericProblem();
+    });
+```
 
-Same-scope generic subtree exclusions cannot be reopened by a narrower translation
-or ancestor rule. Such contradictions fail validation. To exclude descendants
-while allowing their root, combine `For<T>().TranslateEachType()` with
-`ForDescendantsOf<T>().UseGenericProblem()`. A broad inclusion with a narrower
-exclusion is valid. Repeated identical rules are harmless; conflicting behaviors
-for the same selection are errors.
+`WithErrorVisibility` works on endpoints and route groups. Configure each endpoint
+or group once, placing all its rules in one callback. Configuration is validated
+and snapshotted immediately. Duplicate calls on the same builder are rejected
+when its endpoints are constructed, rather than silently depending on call order.
+Endpoints inherit their groups' metadata; sibling routes do not inherit rules
+specific to another endpoint. Nested groups can introduce narrower local scopes.
 
-## ASP.NET integration and lifetime
+Register `AddFlowOnRailsVisibility` once even when only Minimal APIs need local
+rules; an empty global configuration is valid. Endpoint/group configuration does
+not register another policy or use a process-wide static registry.
+
+## Resolution order
+
+For each lookup, including ancestor candidate lookup:
+
+1. The selected endpoint's scope.
+2. Route-group scopes, innermost to outermost.
+3. The exact controller's scope, if controller metadata exists.
+4. The global scope.
+
+Only a scope with no matching rule falls through. A generic-response rule is a
+matching decision, not absence of configuration. A local broad rule therefore
+precedes a global specific rule. Local scopes can explicitly authorize a family
+excluded globally or by an outer group.
+
+Within one scope, the nearest matching error root wins. At that root, priority
+is exact type, descendants-only, then whole tree. Registration order does not
+change that order. Group nesting also determines precedence regardless of the
+order in which different groups were configured.
+
+Rules for base controllers are not inherited by derived controllers. Controller
+classes need not inherit `ControllerBase`. Endpoint metadata rules can coexist
+with controller rules and have higher priority. There is no separately named
+controller-action configuration API in this version.
+
+## Conflict validation
+
+Within the same scope, explicit own-translation or ancestor-lookup rules cannot
+reopen a generic subtree exclusion. Conflicts are configuration errors. A broad
+inclusion with a narrower exclusion is valid, including a whole-tree inclusion
+restricted by a descendants-only exclusion at the same root. The root can remain
+visible while all descendants are generic.
+
+Exact-type generic exclusions do not exclude descendants. Identical duplicate
+rules are harmless; contradictory behaviors for the same selection are errors.
+These same-scope checks do not prohibit deliberate overrides in a more local scope.
+
+## Indexed policy and request lifetime
+
+`Build()` validates and copies the rules, then prepares frozen dictionary indexes:
+controller type to scope index, and error root type to fixed exact/descendants/tree
+slots within each scope. Endpoint and group scopes get equivalent immutable
+indexes when configured.
+
+Runtime resolution follows the inheritance chain and performs indexed lookups.
+It does not filter or sort the full rule collection on each request. Ancestor
+resolution can still walk inheritance chains more than once; this change removes
+dependence on the total number of unrelated rules, not all traversal or allocation.
+There is no resolution cache and no claimed benchmark speedup.
 
 ```csharp
 var policy = httpContext.RequestServices
-    .GetRequiredService<ErrorVisibilityPolicy>();
+    .GetRequiredService<VisibilityPolicy>();
 
-var visibility = policy.ResolveForRequest(error, httpContext);
+var resolution = policy.ResolveForRequest(error, httpContext);
 ```
 
-Request resolution reads `ControllerActionDescriptor.ControllerTypeInfo` from the
-selected endpoint metadata. It does not inspect route names, activate a controller,
-or retain an HttpContext. Minimal APIs and endpoints without controller metadata
-use global rules. For resolution without a request:
+Request resolution reads the selected endpoint's visibility metadata and
+`ControllerActionDescriptor.ControllerTypeInfo`, without activating controllers
+or retaining an HttpContext. An endpoint without local or controller metadata
+uses global rules. Without a request, resolve global/controller rules directly:
 
 ```csharp
-var visibility = policy.Resolve(error.GetType(), typeof(UsersController));
+var resolution = policy.Resolve(error.GetType(), typeof(UsersController));
 ```
 
-The registration builds and validates a singleton snapshot immediately. Later
-changes to a retained builder cannot alter it. The resolver does not inspect
-properties, call `ToString`, or serialize the error. It selects types only.
-Register the policy once; global and controller configurations share that registration.
+The registered policy is a per-container singleton, not static state. Separate
+applications have independent policies. Builder and scope changes after snapshot
+creation do not change an existing policy. The resolver reads types only, not
+properties or `ToString`. The base FlowOnRails assembly has no ASP.NET dependency.
 
-## Next: mapping validation and generator
+## Next: HTTP mapping and analyzer
 
-The visibility core cannot diagnose a missing 404 mapping before a translation
-catalog exists. A later analyzer should distinguish:
-
-- A contract authorized for own translation with no HTTP mapping.
-- An ancestor-lookup rule with no mapped authorized ancestor among known errors.
-- Intentional generic responses, which do not require a mapping.
-
-The diagnostic must consider controller overrides. It must use configured status
-mappings, not guess HTTP status from class names. Runtime configuration validation
-is implemented now; compile-time diagnostics require the future analyzer/generator.
+The visibility core cannot diagnose a missing HTTP mapping before a translation
+catalog exists. A future analyzer should distinguish an authorized own contract
+with no mapping, an ancestor rule with no mapped authorized ancestor, and an
+intentional generic response (which requires no specific mapping). It must take
+all local scopes into account and use configured mappings rather than type names.
 
 References:
 
-- [Controller action metadata](https://source.dot.net/Microsoft.AspNetCore.Mvc.Core/Controllers/ControllerActionDescriptor.cs.html)
-- [ASP.NET Core API error handling](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling-api?view=aspnetcore-10.0)
+- [ASP.NET Core route groups and metadata](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/routing?view=aspnetcore-10.0)
+- [FrozenDictionary](https://learn.microsoft.com/en-us/dotnet/api/system.collections.frozen.frozendictionary-2?view=net-10.0)
