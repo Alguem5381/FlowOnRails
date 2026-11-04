@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Controllers;
 
@@ -6,9 +7,17 @@ namespace FlowOnRails.AspNetCore.Visibility;
 /// <summary>Resolves immutable visibility rules without reading error properties.</summary>
 public sealed class VisibilityPolicy
 {
-    private readonly VisibilityRule[] _rules;
+    private readonly VisibilityIndex _global;
+    private readonly FrozenDictionary<Type, VisibilityIndex> _controllers;
 
-    internal VisibilityPolicy(VisibilityRule[] rules) => _rules = rules;
+    internal VisibilityPolicy(VisibilityRule[] rules)
+    {
+        _global = new(rules.Where(rule => rule.ControllerType is null));
+        _controllers = rules
+            .Where(rule => rule.ControllerType is not null)
+            .GroupBy(rule => rule.ControllerType!)
+            .ToFrozenDictionary(group => group.Key, group => new VisibilityIndex(group));
+    }
 
     /// <summary>
     /// Resolve a closed error type. Exact controller rules precede global rules; within a scope,
@@ -73,34 +82,22 @@ public sealed class VisibilityPolicy
         return Resolve(error.GetType(), controllerType);
     }
 
-    private VisibilityRule? FindRule(Type errorType, Type? controllerType)
+    private VisibilityRule?
+        FindRule(
+            Type errorType,
+            Type? controllerType
+        )
     {
-        if (controllerType is null)
-            return FindInScope(errorType, null);
-
-        var local = FindInScope(errorType, controllerType);
-
-        return local ?? FindInScope(errorType, null);
-    }
-
-    private VisibilityRule? FindInScope(Type errorType, Type? controllerType)
-    {
-        for (var ancestor = errorType;
-             ancestor is not null && typeof(Error).IsAssignableFrom(ancestor);
-             ancestor = ancestor.BaseType)
+        if (controllerType is not null &&
+            _controllers.TryGetValue(controllerType, out var controller))
         {
-            var match = _rules
-                .Where(rule => rule.ControllerType == controllerType &&
-                               rule.Selection.Root == ancestor &&
-                               rule.Selection.IncludesType(errorType))
-                .OrderBy(rule => rule.Selection.Range)
-                .FirstOrDefault();
+            var local = controller.FindRule(errorType);
 
-            if (match is not null)
-                return match;
+            if (local is not null)
+                return local;
         }
 
-        return null;
+        return _global.FindRule(errorType);
     }
 
     internal static void ValidateController(Type controllerType)
