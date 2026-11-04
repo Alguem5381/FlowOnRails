@@ -1,31 +1,40 @@
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Configures global visibility and overrides for individual controller types.</summary>
-public sealed class ErrorVisibilityBuilder : ErrorVisibilityRules
+public sealed class VisibilityBuilder
 {
     private readonly List<VisibilityRule> _rules;
 
     /// <summary>Create an empty configuration, which uses the generic response by default.</summary>
-    public ErrorVisibilityBuilder() : this([]) { }
+    public VisibilityBuilder() : this([]) { }
 
-    private ErrorVisibilityBuilder(List<VisibilityRule> rules)
-        : base(rules, null, new ErrorSelection(typeof(Error), ErrorRange.Tree)) => _rules = rules;
+    private VisibilityBuilder(List<VisibilityRule> rules)
+    {
+        _rules = rules;
+        Global = new(rules, null, new(typeof(Error), ErrorRange.Tree));
+    }
+
+    /// <summary>Configure visibility shared by all endpoints unless a local rule overrides it.</summary>
+    public VisibilityScope Global { get; }
 
     /// <summary>Configure overrides for this exact controller type; its subclasses do not inherit them.</summary>
-    public void ForController<TController>(Action<ErrorVisibilityRules> configure) where TController : class
+    public void
+        ForController<TController>(
+            Action<VisibilityScope> configure
+        )
+        where TController : class
     {
         ArgumentNullException.ThrowIfNull(configure);
 
         var controller = typeof(TController);
 
-        ErrorVisibilityPolicy.ValidateController(controller);
+        VisibilityPolicy.ValidateController(controller);
 
-        configure(new ErrorVisibilityRules(_rules, controller, new ErrorSelection(typeof(Error), ErrorRange.Tree)));
+        configure(new VisibilityScope(_rules, controller, new ErrorSelection(typeof(Error), ErrorRange.Tree)));
     }
 
     /// <summary>Validate the rules and build an immutable policy snapshot.</summary>
-    /// <exception cref="ArgumentNullException"></exception>
-    public ErrorVisibilityPolicy Build()
+    public VisibilityPolicy Build()
     {
         var rules = _rules.Select(rule => rule.Snapshot()).ToArray();
 
@@ -40,27 +49,18 @@ public sealed class ErrorVisibilityBuilder : ErrorVisibilityRules
                     $"Conflicting visibility rules for '{group.Key.Selection.Root}' ({group.Key.Selection.Range}).");
 
         foreach (var blocked in rules.Where(rule =>
-                     rule.Behavior == ErrorVisibilityBehavior.GenericProblem &&
+                     rule.Behavior == VisibilityBehavior.GenericProblem &&
                      rule.Selection.Range != ErrorRange.Exact))
 
         foreach (var other in rules.Where(rule =>
                      rule.ControllerType == blocked.ControllerType &&
-                     rule.Behavior != ErrorVisibilityBehavior.GenericProblem))
+                     rule.Behavior != VisibilityBehavior.GenericProblem))
         {
-            var sameRoot = blocked.Selection.Root == other.Selection.Root;
-
-            var startsInside = !sameRoot && blocked.Selection.Matches(other.Selection.Root);
-
-            var moreSpecificAtSameRoot = sameRoot && other.Selection.Range < blocked.Selection.Range;
-
-            var overlapsBlockedRange = blocked.Selection.Matches(other.Selection.Root) ||
-                                       other.Selection.Range != ErrorRange.Exact;
-
-            if (startsInside || (moreSpecificAtSameRoot && overlapsBlockedRange))
+            if (other.Selection.ReopensExcludedRange(blocked.Selection))
                 throw new InvalidOperationException(
                     $"Rule for '{other.Selection.Root}' contradicts the generic-response exclusion of '{blocked.Selection.Root}'.");
         }
 
-        return new ErrorVisibilityPolicy([.. rules.DistinctBy(rule => (rule.ControllerType, rule.Selection))]);
+        return new VisibilityPolicy([.. rules.DistinctBy(rule => (rule.ControllerType, rule.Selection))]);
     }
 }

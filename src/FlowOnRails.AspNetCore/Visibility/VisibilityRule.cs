@@ -4,19 +4,29 @@ internal enum ErrorRange { Exact, Descendants, Tree }
 
 internal readonly record struct ErrorSelection(Type Root, ErrorRange Range)
 {
-    internal bool Matches(Type type) => Range switch
+    internal bool IncludesType(Type type) => Range switch
     {
         ErrorRange.Exact => type == Root,
         ErrorRange.Descendants => type != Root && Root.IsAssignableFrom(type),
-        _ => Root.IsAssignableFrom(type)
+        ErrorRange.Tree => Root.IsAssignableFrom(type),
+        _ => throw new ArgumentOutOfRangeException(nameof(Range), Range, "Unknown error selection range.")
     };
 
-    internal bool Contains(ErrorSelection other)
+    internal bool ContainsSelection(ErrorSelection other)
     {
         if (other.Root == Root)
             return Range == ErrorRange.Tree || Range == other.Range;
 
-        return Range != ErrorRange.Exact && Matches(other.Root);
+        return IncludesType(other.Root);
+    }
+
+    internal bool ReopensExcludedRange(ErrorSelection blocked)
+    {
+        if (blocked.Root != Root)
+            return blocked.IncludesType(Root);
+
+        return blocked.Range == ErrorRange.Tree &&
+               Range is ErrorRange.Exact or ErrorRange.Descendants;
     }
 }
 
@@ -24,9 +34,9 @@ internal sealed class VisibilityRule(ErrorSelection selection, Type? controllerT
 {
     internal ErrorSelection Selection { get; } = selection;
     internal Type? ControllerType { get; } = controllerType;
-    internal ErrorVisibilityBehavior? Behavior { get; private set; }
+    internal VisibilityBehavior? Behavior { get; private set; }
 
-    internal void SetBehavior(ErrorVisibilityBehavior behavior)
+    internal void SetBehavior(VisibilityBehavior behavior)
     {
         if (Behavior is { } existing && existing != behavior)
             throw new InvalidOperationException(
@@ -35,5 +45,7 @@ internal sealed class VisibilityRule(ErrorSelection selection, Type? controllerT
         Behavior = behavior;
     }
 
-    internal VisibilityRule Snapshot() => new(Selection, ControllerType) { Behavior = Behavior };
+    internal VisibilityRule
+        Snapshot(
+        ) => new(Selection, ControllerType) { Behavior = Behavior };
 }

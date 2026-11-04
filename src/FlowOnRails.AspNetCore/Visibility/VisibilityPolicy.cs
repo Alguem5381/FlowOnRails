@@ -4,17 +4,17 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Resolves immutable visibility rules without reading error properties.</summary>
-public sealed class ErrorVisibilityPolicy
+public sealed class VisibilityPolicy
 {
     private readonly VisibilityRule[] _rules;
 
-    internal ErrorVisibilityPolicy(VisibilityRule[] rules) => _rules = rules;
+    internal VisibilityPolicy(VisibilityRule[] rules) => _rules = rules;
 
     /// <summary>
     /// Resolve a closed error type. Exact controller rules precede global rules; within a scope,
     /// the nearest error root wins, with exact, descendants-only, then tree rules breaking ties.
     /// </summary>
-    public ErrorVisibilityResolution Resolve(Type errorType, Type? controllerType = null)
+    public VisibilityResolution Resolve(Type errorType, Type? controllerType = null)
     {
         ArgumentNullException.ThrowIfNull(errorType);
 
@@ -25,13 +25,13 @@ public sealed class ErrorVisibilityPolicy
             ValidateController(controllerType);
 
         var effectiveRule = FindRule(errorType, controllerType);
-        var behavior = effectiveRule?.Behavior ?? ErrorVisibilityBehavior.GenericProblem;
+        var behavior = effectiveRule?.Behavior ?? VisibilityBehavior.GenericProblem;
 
         switch (behavior)
         {
-            case ErrorVisibilityBehavior.GenericProblem:
+            case VisibilityBehavior.GenericProblem:
                 return new(behavior, []);
-            case ErrorVisibilityBehavior.TranslateEachType:
+            case VisibilityBehavior.TranslateEachType:
                 return new(behavior, [errorType]);
         }
 
@@ -45,24 +45,24 @@ public sealed class ErrorVisibilityPolicy
         {
             var rule = FindRule(ancestor, controllerType);
             // An explicit generic response is a boundary; an unconfigured ancestor is not.
-            if (rule?.Behavior == ErrorVisibilityBehavior.GenericProblem)
+            if (rule?.Behavior == VisibilityBehavior.GenericProblem)
                 break;
 
-            if (effectiveRule is not null && effectiveRule.Selection.Matches(ancestor))
+            if (effectiveRule is not null && effectiveRule.Selection.IncludesType(ancestor))
                 continue;
 
-            if (rule?.Behavior == ErrorVisibilityBehavior.TranslateEachType)
+            if (rule?.Behavior == VisibilityBehavior.TranslateEachType)
                 candidates.Add(ancestor);
         }
 
-        return new ErrorVisibilityResolution(behavior, candidates);
+        return new VisibilityResolution(behavior, candidates);
     }
 
     /// <summary>
     /// Resolve an error using the current endpoint's controller metadata.
     /// Endpoints without controller metadata use global rules. No controller instance is created.
     /// </summary>
-    public ErrorVisibilityResolution ResolveForRequest(Error error, HttpContext httpContext)
+    public VisibilityResolution ResolveForRequest(Error error, HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(httpContext);
@@ -92,7 +92,7 @@ public sealed class ErrorVisibilityPolicy
             var match = _rules
                 .Where(rule => rule.ControllerType == controllerType &&
                                rule.Selection.Root == ancestor &&
-                               rule.Selection.Matches(errorType))
+                               rule.Selection.IncludesType(errorType))
                 .OrderBy(rule => rule.Selection.Range)
                 .FirstOrDefault();
 

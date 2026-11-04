@@ -1,13 +1,13 @@
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Selects error types within a global, controller, or tree scope.</summary>
-public class ErrorVisibilityRules
+public class VisibilityScope
 {
     private readonly List<VisibilityRule> _rules;
     private readonly Type? _controllerType;
     private readonly ErrorSelection _bounds;
 
-    internal ErrorVisibilityRules(List<VisibilityRule> rules, Type? controllerType, ErrorSelection bounds)
+    internal VisibilityScope(List<VisibilityRule> rules, Type? controllerType, ErrorSelection bounds)
     {
         _rules = rules;
         _controllerType = controllerType;
@@ -15,26 +15,30 @@ public class ErrorVisibilityRules
     }
 
     /// <summary>Select only this error type.</summary>
-    public ErrorVisibilitySelection For<TError>() where TError : Error =>
+    public VisibilitySelection For<TError>() where TError : Error =>
         Select(typeof(TError), ErrorRange.Exact);
 
     /// <summary>Select this error type and all its descendants.</summary>
-    public ErrorVisibilitySelection ForTree<TError>() where TError : Error =>
+    public VisibilitySelection ForTree<TError>() where TError : Error =>
         Select(typeof(TError), ErrorRange.Tree);
 
     /// <summary>Select descendants without selecting their root.</summary>
-    public ErrorVisibilitySelection ForDescendantsOf<TError>() where TError : Error =>
+    public VisibilitySelection ForDescendantsOf<TError>() where TError : Error =>
         Select(typeof(TError), ErrorRange.Descendants);
 
     /// <summary>Configure a block bounded by this error type and its descendants.</summary>
-    public void ForTree<TError>(Action<ErrorVisibilityTree> configure) where TError : Error =>
+    public void ForTree<TError>(Action<VisibilityTree> configure) where TError : Error =>
         ConfigureTree(typeof(TError), ErrorRange.Tree, configure);
 
     /// <summary>Configure a block bounded by the descendants, excluding the root.</summary>
-    public void ForDescendantsOf<TError>(Action<ErrorVisibilityTree> configure) where TError : Error =>
+    public void
+        ForDescendantsOf<TError>(
+            Action<VisibilityTree> configure
+        )
+        where TError : Error =>
         ConfigureTree(typeof(TError), ErrorRange.Descendants, configure);
 
-    private ErrorVisibilitySelection Select(Type root, ErrorRange range)
+    private VisibilitySelection Select(Type root, ErrorRange range)
     {
         var selection = ValidateSelection(root, range);
 
@@ -42,23 +46,23 @@ public class ErrorVisibilityRules
 
         _rules.Add(rule);
 
-        return new ErrorVisibilitySelection(rule);
+        return new VisibilitySelection(rule);
     }
 
-    private void ConfigureTree(Type root, ErrorRange range, Action<ErrorVisibilityTree> configure)
+    private void ConfigureTree(Type root, ErrorRange range, Action<VisibilityTree> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
 
         var bounds = ValidateSelection(root, range);
 
-        configure(new ErrorVisibilityTree(_rules, _controllerType, bounds));
+        configure(new VisibilityTree(_rules, _controllerType, bounds));
     }
 
     private ErrorSelection ValidateSelection(Type root, ErrorRange range)
     {
         var selection = new ErrorSelection(root, range);
 
-        return !_bounds.Contains(selection)
+        return !_bounds.ContainsSelection(selection)
             ? throw new ArgumentException(
                 $"Selection '{root}' ({range}) is outside '{_bounds.Root}' ({_bounds.Range}).")
             : selection;

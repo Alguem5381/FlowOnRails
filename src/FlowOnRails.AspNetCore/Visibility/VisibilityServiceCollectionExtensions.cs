@@ -11,16 +11,16 @@ public static class VisibilityServiceCollectionExtensions
         /// Configure and validate a singleton visibility snapshot. This does not register HTTP
         /// translators, exception handlers, or ProblemDetails writers. Register visibility once.
         /// </summary>
-        public IServiceCollection AddFlowOnRailsVisibility(Action<ErrorVisibilityBuilder> configure)
+        public IServiceCollection AddFlowOnRailsVisibility(Action<VisibilityBuilder> configure)
         {
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(configure);
 
-            if (services.Any(descriptor => descriptor.ServiceType == typeof(ErrorVisibilityPolicy)))
+            if (services.Any(descriptor => descriptor.ServiceType == typeof(VisibilityPolicy)))
                 throw new InvalidOperationException(
                     "FlowOnRails visibility is already registered. Configure global and controller rules in the same registration.");
 
-            var builder = new ErrorVisibilityBuilder();
+            var builder = new VisibilityBuilder();
 
             configure(builder);
             services.AddSingleton(builder.Build());

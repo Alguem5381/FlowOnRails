@@ -1,18 +1,20 @@
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Assigns a behavior to a selected error type or family.</summary>
-public sealed class ErrorVisibilitySelection
+public sealed class VisibilitySelection
 {
     private readonly VisibilityRule _rule;
 
-    internal ErrorVisibilitySelection(VisibilityRule rule) => _rule = rule;
+    internal VisibilitySelection(VisibilityRule rule) => _rule = rule;
 
     /// <summary>Permit each selected type's own translation contract.</summary>
-    public void TranslateEachType() => _rule.SetBehavior(ErrorVisibilityBehavior.TranslateEachType);
+    public void TranslateEachType() => _rule.SetBehavior(VisibilityBehavior.TranslateEachType);
 
     /// <summary>Use the generic response for the selected errors.</summary>
-    public void UseGenericProblem() => _rule.SetBehavior(ErrorVisibilityBehavior.GenericProblem);
+    public void UseGenericProblem() => _rule.SetBehavior(VisibilityBehavior.GenericProblem);
 
     /// <summary>Search outside the selection for an authorized ancestor translation contract.</summary>
-    public void UseNearestAncestorMapping() => _rule.SetBehavior(ErrorVisibilityBehavior.NearestAncestorMapping);
+    public void
+        UseNearestAncestorMapping(
+        ) => _rule.SetBehavior(VisibilityBehavior.NearestAncestorMapping);
 }

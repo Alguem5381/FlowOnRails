@@ -1,7 +1,7 @@
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Describes which error contract may be used for translation.</summary>
-public enum ErrorVisibilityBehavior
+public enum VisibilityBehavior
 {
     /// <summary>Use the generic response without projecting error data.</summary>
     GenericProblem,

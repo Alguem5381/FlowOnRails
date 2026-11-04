@@ -24,22 +24,22 @@ public class VisibilityAspNetCoreTests
     public void Registration_ProvidesAnImmutableSingletonAndValidatesBeforeAddingServices()
     {
         var services = new ServiceCollection();
-        ErrorVisibilityBuilder? retainedBuilder = null;
+        VisibilityBuilder? retainedBuilder = null;
         services.AddFlowOnRailsVisibility(visibility =>
         {
             retainedBuilder = visibility;
-            visibility.ForTree<PublicError>().TranslateEachType();
+            visibility.Global.ForTree<PublicError>().TranslateEachType();
         });
         using var provider = services.BuildServiceProvider(validateScopes: true);
-        var policy = provider.GetRequiredService<ErrorVisibilityPolicy>();
+        var policy = provider.GetRequiredService<VisibilityPolicy>();
         using var scope = provider.CreateScope();
-        Assert.Same(policy, scope.ServiceProvider.GetRequiredService<ErrorVisibilityPolicy>());
-        retainedBuilder!.For<InternalNotFound>().UseGenericProblem();
+        Assert.Same(policy, scope.ServiceProvider.GetRequiredService<VisibilityPolicy>());
+        retainedBuilder!.Global.For<InternalNotFound>().UseGenericProblem();
         Assert.Equal(new[] { typeof(InternalNotFound) }, policy.Resolve(typeof(InternalNotFound)).TranslationCandidates);
 
         var invalidServices = new ServiceCollection();
-        Assert.Throws<InvalidOperationException>(() => invalidServices.AddFlowOnRailsVisibility(visibility => visibility.For<NotFound>()));
-        Assert.DoesNotContain(invalidServices, descriptor => descriptor.ServiceType == typeof(ErrorVisibilityPolicy));
+        Assert.Throws<InvalidOperationException>(() => invalidServices.AddFlowOnRailsVisibility(visibility => visibility.Global.For<NotFound>()));
+        Assert.DoesNotContain(invalidServices, descriptor => descriptor.ServiceType == typeof(VisibilityPolicy));
         Assert.Throws<InvalidOperationException>(() => services.AddFlowOnRailsVisibility(_ => { }));
         Assert.Throws<ArgumentNullException>(() => services.AddFlowOnRailsVisibility(null!));
     }
@@ -52,8 +52,8 @@ public class VisibilityAspNetCoreTests
         var services = new ServiceCollection();
         services.AddFlowOnRailsVisibility(visibility =>
         {
-            visibility.For<NotFound>().TranslateEachType();
-            visibility.ForDescendantsOf<NotFound>().UseNearestAncestorMapping();
+            visibility.Global.For<NotFound>().TranslateEachType();
+            visibility.Global.ForDescendantsOf<NotFound>().UseNearestAncestorMapping();
             visibility.ForController<UsersController>(local => local.ForTree<PublicError>().UseGenericProblem());
         });
         using var provider = services.BuildServiceProvider();
@@ -61,7 +61,7 @@ public class VisibilityAspNetCoreTests
         var controllerType = admin ? typeof(AdminController) : typeof(UsersController);
         var descriptor = new ControllerActionDescriptor { ControllerTypeInfo = controllerType.GetTypeInfo() };
         context.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(descriptor), "selected action"));
-        var result = provider.GetRequiredService<ErrorVisibilityPolicy>().ResolveForRequest(new InternalNotFound(), context);
+        var result = provider.GetRequiredService<VisibilityPolicy>().ResolveForRequest(new InternalNotFound(), context);
         Assert.Equal(admin ? new[] { typeof(NotFound) } : Array.Empty<Type>(), result.TranslationCandidates);
     }
 
@@ -70,9 +70,9 @@ public class VisibilityAspNetCoreTests
     [InlineData(true)]
     public void RequestsWithoutControllerMetadata_UseOnlyGlobalRules(bool hasEndpoint)
     {
-        var builder = new ErrorVisibilityBuilder();
-        builder.For<NotFound>().TranslateEachType();
-        builder.ForDescendantsOf<NotFound>().UseNearestAncestorMapping();
+        var builder = new VisibilityBuilder();
+        builder.Global.For<NotFound>().TranslateEachType();
+        builder.Global.ForDescendantsOf<NotFound>().UseNearestAncestorMapping();
         builder.ForController<UsersController>(local => local.ForTree<PublicError>().UseGenericProblem());
         var context = new DefaultHttpContext();
         if (hasEndpoint) context.SetEndpoint(new Endpoint(null, EndpointMetadataCollection.Empty, "minimal endpoint"));
@@ -82,7 +82,7 @@ public class VisibilityAspNetCoreTests
     [Fact]
     public void NullRequestArguments_AreRejected()
     {
-        var policy = new ErrorVisibilityBuilder().Build();
+        var policy = new VisibilityBuilder().Build();
         Assert.Throws<ArgumentNullException>(() => policy.ResolveForRequest(null!, new DefaultHttpContext()));
         Assert.Throws<ArgumentNullException>(() => policy.ResolveForRequest(new InternalNotFound(), null!));
     }
