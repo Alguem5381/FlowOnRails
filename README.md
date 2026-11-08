@@ -203,9 +203,10 @@ See [operation semantics](https://github.com/Alguem5381/FlowOnRails/blob/main/do
 
 The separate `FlowOnRails.AspNetCore` project now contains an error visibility
 policy with explicit global, controller, endpoint and route-group rules, backed
-by immutable indexes. HTTP translation, response
-helpers and generator/analyzer support are planned. This project is not yet a
-published package. See the [visibility design](docs/design/aspnetcore-visibility.md).
+by immutable indexes. It also implements exact HTTP translations, generated property
+projectors and native HTTP/MVC result adapters. The satellite is not yet published.
+See the [integration guide and runnable sample](src/FlowOnRails.AspNetCore/README.md)
+and the [visibility design](docs/design/aspnetcore-visibility.md).
 
 ## Contributing
 
