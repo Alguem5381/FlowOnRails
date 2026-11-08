@@ -62,6 +62,32 @@ public class GeneratorTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExplicitlyMappedObsoleteContracts_AreGeneratedWithNativeCompilerDiagnostics(bool error)
+    {
+        var result = Generate(Imports + $$"""
+            [System.Obsolete("Use ReplacementError instead.", error: {{(error ? "true" : "false")}})]
+            public record RetiredError(int Code) : Error;
+            public static partial class Problems {
+                [HttpProblem(410), AutomaticExtensions]
+                private static void Configure(ProblemBuilder<RetiredError> p) { }
+            }
+            """);
+
+        Assert.Empty(result.GeneratorDiagnostics);
+        Assert.Contains("catalog.Add<global::Consumer.RetiredError>", result.Code);
+        Assert.Contains("error.@Code;", result.Code);
+        Assert.Contains(result.Compilation.GetDiagnostics(), item =>
+            item.Location.SourceTree?.FilePath == "Source0.cs" &&
+            item.Id == (error ? "CS0619" : "CS0618") &&
+            item.Severity == (error ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning));
+
+        if (!error)
+            AssertNoErrors(result);
+    }
+
+    [Theory]
     [InlineData("private static int Wrong(ProblemBuilder<E> p) => 1;", "001")]
     [InlineData("private static async void Wrong(ProblemBuilder<E> p) { await System.Threading.Tasks.Task.Yield(); }", "001")]
     [InlineData("private static void Wrong<T>(ProblemBuilder<E> p) { }", "001")]

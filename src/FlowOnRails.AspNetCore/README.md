@@ -114,6 +114,9 @@ assembly is included automatically. Mapping discovery uses compilation symbols,
 without loading assemblies at runtime or guessing endpoint return paths. Only
 contracts explicitly mapped from selected assemblies are referenced in generated
 code; unrelated file-local or obsolete errors do not affect registration.
+`Obsolete` does not remove an explicitly configured mapping or projector. Such
+references retain normal C# diagnostics: a warning by default, or a compilation
+error when `ObsoleteAttribute.IsError` is true.
 Only mapped automatic contracts need generated projectors. Closed generic contracts
 can appear explicitly in mapping signatures; open generic definitions are not maps.
 
