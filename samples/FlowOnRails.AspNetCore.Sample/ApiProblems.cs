@@ -18,7 +18,9 @@ public static partial class ApiProblems
     {
         problem.Type("https://example.test/problems/invalid-user-id");
         problem.Title("Invalid user identifier");
-        problem.Extensions((error, extensions) => extensions["invalidId"] = error.Id);
+        problem.Extensions((error, extensions) =>
+            extensions["invalidId"] = error.Id
+        );
     }
 
     [GenericProblem]
@@ -26,6 +28,8 @@ public static partial class ApiProblems
     {
         problem.Type("https://example.test/problems/unexpected");
         problem.Title("Unable to complete the operation");
-        problem.Extensions((context, extensions) => extensions["requestId"] = context.TraceIdentifier);
+        problem.Extensions((context, extensions) =>
+            extensions["requestId"] = context.TraceIdentifier
+        );
     }
 }

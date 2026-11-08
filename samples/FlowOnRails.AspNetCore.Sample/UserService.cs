@@ -20,5 +20,7 @@ public sealed class UserDto
 }
 
 public abstract record SampleError : Error;
+
 public sealed record UserNotFound(int Id, string? Reason = null) : SampleError;
+
 public sealed record InvalidUserId(int Id) : SampleError;
