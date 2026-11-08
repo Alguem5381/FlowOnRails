@@ -34,6 +34,25 @@ public sealed class ProblemGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        foreach (var marker in new[] { "HttpProblem", "GenericProblem", "AutomaticExtensions", "UseDataField" })
+        {
+            var invalidTargets = context.SyntaxProvider.ForAttributeWithMetadataName(
+                    Prefix + marker + "Attribute",
+                    static (node, _) => node is not MethodDeclarationSyntax,
+                    static (syntax, _) => syntax.TargetSymbol is IMethodSymbol method && method.MethodKind != MethodKind.Ordinary
+                        ? Diagnostic.Create(InvalidMethod, syntax.TargetNode.GetLocation(), method.Name, "configuration builder")
+                        : null)
+                .Where(static diagnostic => diagnostic is not null);
+
+            context.RegisterSourceOutput(invalidTargets, static (output, diagnostic) => output.ReportDiagnostic(diagnostic!));
+        }
+
+        var invalidContainers = context.SyntaxProvider.ForAttributeWithMetadataName(
+                Prefix + "ErrorAssemblyAttribute",
+                static (node, _) => node is not ClassDeclarationSyntax,
+                static (syntax, _) => Diagnostic.Create(InvalidClass, syntax.TargetNode.GetLocation(), syntax.TargetSymbol.Name));
+        context.RegisterSourceOutput(invalidContainers, static (output, diagnostic) => output.ReportDiagnostic(diagnostic));
+
         // Bound discovery to attributed configuration classes, not a whole-compilation provider.
         var profiles = context.SyntaxProvider.CreateSyntaxProvider(
                 static (node, _) => IsCandidate(node),
@@ -73,8 +92,9 @@ public sealed class ProblemGenerator : IIncrementalGenerator
             return null;
 
         var methods = type.GetMembers().OfType<IMethodSymbol>()
-            .Where(method => Has(method, "HttpProblem") || Has(method, "GenericProblem") ||
-                             Has(method, "AutomaticExtensions") || Has(method, "UseDataField"))
+            .Where(method => method.MethodKind == MethodKind.Ordinary &&
+                             (Has(method, "HttpProblem") || Has(method, "GenericProblem") ||
+                              Has(method, "AutomaticExtensions") || Has(method, "UseDataField")))
             .OrderBy(method => method.Name, StringComparer.Ordinal).ToArray();
         var assemblyMarkers = type.GetAttributes().Where(attribute => Is(attribute, "ErrorAssembly")).ToArray();
 

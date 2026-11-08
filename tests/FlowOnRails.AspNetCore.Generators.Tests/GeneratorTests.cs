@@ -264,6 +264,25 @@ public class GeneratorTests
         Assert.All(first, item => Assert.InRange(item.HintName.Length, 1, 160));
     }
 
+    [Theory]
+    [InlineData("void Outer() { [HttpProblem(400)] static void Local(ProblemBuilder<E> p) { } }")]
+    [InlineData("void Outer() { System.Action<ProblemBuilder<E>> f = [HttpProblem(400)] (ProblemBuilder<E> p) => { }; }")]
+    [InlineData("[HttpProblem(400)] public Holder() { }")]
+    public void AttributesOnUnsupportedMethodKinds_AreNotSilentlyIgnored(string member)
+    {
+        var result = Generate(Imports + "public record E : Error; public class Holder { " + member + " }");
+
+        Assert.Contains(result.GeneratorDiagnostics, item => item.Id == "FORHTTP001");
+    }
+
+    [Fact]
+    public void AssemblyMarkersOnRecords_AreReportedAsInvalidContainers()
+    {
+        var result = Generate(Imports + "[ErrorAssembly(typeof(UserNotFound))] public record Wrong;");
+
+        Assert.Contains(result.GeneratorDiagnostics, item => item.Id == "FORHTTP002");
+    }
+
     private static void AssertNoErrors(Generated result)
     {
         Assert.DoesNotContain(result.GeneratorDiagnostics, item => item.Severity == DiagnosticSeverity.Error);
