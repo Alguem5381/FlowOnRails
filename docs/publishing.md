@@ -1,61 +1,107 @@
 # Publicação no NuGet
 
-A versão em preparação é **0.2.0**. O identificador do pacote é `FlowOnRails`, de propriedade da conta NuGet `alguem5381`.
+O repositório produz dois pacotes independentes:
+
+| Pacote | Projeto | Versão configurada | Formato da tag |
+|---|---|---|---|
+| `FlowOnRails` | `src/FlowOnRails/FlowOnRails.csproj` | `0.2.0` | `v<versão>` ou `<versão>` |
+| `FlowOnRails.AspNetCore` | `src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj` | `0.1.0` | `aspnetcore/v<versão>` |
+
+`FlowOnRails.AspNetCore` inclui o gerador em `analyzers/dotnet/cs` e declara sua
+dependência de `FlowOnRails`. O projeto do gerador não é publicado separadamente.
+A solução compartilhada permite compilar e testar todos os projetos; cada pacote
+mantém seu próprio identificador e sua própria versão.
 
 ## O que dispara cada fluxo
 
 | Evento | CI (`ci.yml`) | Publicação (`cd.yml`) |
 |---|---|---|
-| Push em `main` ou `develop` | Restore, build, testes e geração local do pacote, em Release | Não publica |
+| Push em `main` ou `develop` | Compila, testa, empacota e verifica consumidores isolados | Não publica |
 | Pull request para `main` ou `develop` | Mesma validação | Não publica |
-| Criação de uma tag sem release | Não dispara por esse evento | Não publica |
-| Release salva como rascunho | Não dispara por esse evento | Não publica |
-| Release publicada no GitHub | Validação no próprio CD | Valida a tag, restaura, compila, testa, gera e envia o pacote ao NuGet |
+| Tag sem release ou release em rascunho | Não publica | Não publica |
+| Release publicada no GitHub | Validação no próprio CD | Publica somente o pacote selecionado pela tag |
 
-O CD usa `release: types: [published]` e faz checkout da tag da release. Esse evento também inclui pré-releases publicadas; nesse caso, a versão no projeto deve ter o sufixo correspondente. A tag `v0.2.0` ou `0.2.0` corresponde à versão atual. Uma tag diferente falha antes da autenticação e do envio.
+O CD usa `release: types: [published]` e faz checkout da tag. O script
+`scripts/select-release-package.sh` seleciona o projeto e confere sua versão antes
+da autenticação. Por exemplo, `aspnetcore/v0.1.0` seleciona exclusivamente
+`FlowOnRails.AspNetCore.0.1.0.nupkg`; uma tag `v0.3.0` exige que a base esteja
+configurada como `0.3.0`. Tags desconhecidas ou versões incompatíveis falham.
 
-Não há gatilho de publicação por push nem execução manual. A configuração existente de `concurrency` serializa execuções para a mesma tag. Reexecutar uma release já publicada no NuGet pode falhar por versão duplicada: o fluxo não silencia esse conflito.
+Pré-releases seguem a mesma regra: para `aspnetcore/v0.1.0-beta.1`, a versão do
+projeto deve ser `0.1.0-beta.1`. O nome da release não é usado para escolher o pacote.
+O fluxo gera os dois pacotes para validação, mas envia apenas o arquivo selecionado,
+sem um curinga que possa publicar a base junto com o satélite.
 
-## Configuração única do acesso
+## Validação dos pacotes
 
-O workflow usa [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing) com [NuGet/login](https://github.com/NuGet/login). Não exige guardar uma API key permanente no repositório.
+CI e CD executam os testes .NET e os testes do seletor de releases. Depois, geram
+os dois `.nupkg` e executam `scripts/verify-packages.py`:
 
-Na conta NuGet, conferir ou criar uma política com estes dados:
+- Confere README, documentação XML, licença, framework e dependências dos pacotes.
+- Confere que o SG está na pasta de analyzers, sem Roslyn como dependência de execução.
+- Copia os consumidores de `tests/packaging` para um diretório temporário fora do repositório.
+- Restaura em um cache novo e compila apenas com `PackageReference`, sem referências aos projetos locais.
+- Executa estados de sucesso/falha da base e respostas HTTP/MVC do satélite, incluindo XML e problema genérico.
+- Provoca um status inválido e exige o diagnóstico `FORHTTP004` do gerador empacotado.
+
+Na publicação do satélite, uma segunda execução com `--published-base` permite
+restaurar `FlowOnRails` exclusivamente do NuGet público. Assim, uma dependência que
+só existe no código local impede a publicação antes da autenticação. Se o satélite
+passar a depender de uma nova versão da base, publique a base primeiro.
+
+Para repetir a validação localmente, a partir da raiz:
+
+```sh
+dotnet restore FlowOnRails.slnx
+dotnet build FlowOnRails.slnx -c Release --no-restore
+dotnet test FlowOnRails.slnx -c Release --no-build --no-restore
+python3 -m unittest discover -s tests/packaging -p 'test_*.py'
+dotnet pack src/FlowOnRails/FlowOnRails.csproj -c Release --no-build --no-restore --output ./artifacts/packages
+dotnet pack src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj -c Release --no-build --no-restore --output ./artifacts/packages
+python3 scripts/verify-packages.py ./artifacts/packages
+python3 scripts/verify-packages.py ./artifacts/packages --published-base
+bash scripts/select-release-package.sh aspnetcore/v0.1.0
+```
+
+Use um diretório de saída sem versões antigas dos mesmos pacotes. A validação
+requer .NET 10, Python 3 e permissão para abrir uma porta temporária de loopback.
+Somente a variante `--published-base` acessa o NuGet público para restaurar o
+consumidor; a variante local usa exclusivamente os pacotes gerados.
+
+## Configuração do acesso
+
+O workflow usa [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
+com `NuGet/login@v1`, obtendo uma credencial temporária após as validações.
+
+A política na conta NuGet deve corresponder a:
 
 | Campo | Valor |
 |---|---|
-| Proprietário da política/pacote | `alguem5381` |
+| Conta proprietária | `alguem5381` |
 | GitHub Repository Owner | `Alguem5381` |
 | Repository | `FlowOnRails` |
-| Workflow File | `cd.yml` (somente o nome do arquivo) |
-| Environment | Em branco: o job atual não declara um GitHub Environment |
-| Escopo de pacote | `FlowOnRails` |
-| Operação necessária | Publicar novas versões de um pacote existente |
+| Workflow File | `cd.yml` |
+| Environment | Em branco, pois o job não declara um environment |
+| Pacotes permitidos | `FlowOnRails` e `FlowOnRails.AspNetCore`, por exemplo com o padrão `FlowOnRails*` |
+| Operações | Novas versões e, para a primeira publicação do satélite, criação de pacote |
 
-Se já existir uma política compatível, verificar se está ativa. Não é necessário criar outra. O nome de usuário fornecido a `NuGet/login` deve corresponder à conta proprietária da política. O job solicita `id-token: write`; o NuGet troca o token OIDC por uma credencial temporária, usada somente no passo de envio.
+O job mantém `id-token: write`. Uma política limitada ao pacote base ou apenas a
+novas versões não autoriza a primeira publicação do satélite. Confira o escopo na
+conta antes da release; esta configuração de empacotamento não altera a política
+nem confirma seu estado atual. O login no navegador é usado para administrar essa
+política, enquanto o workflow autentica cada publicação por conta própria.
 
-O login no navegador serve para configurar e conferir essa política. Depois disso, o workflow autentica por conta própria a cada release.
+## Procedimento de publicação
 
-## Procedimento para uma versão
+1. Atualizar a versão do pacote que será publicado e revisar seu guia e changelog.
+2. Enviar a branch e obter CI aprovado, depois integrar os commits revisados à `main`.
+3. Conferir o escopo da política NuGet e a disponibilidade da versão desejada.
+4. Criar uma release apontando para o commit revisado, usando a tag do pacote escolhido.
+5. Publicar a release para disparar o CD e conferir o resultado no GitHub e no NuGet.
 
-1. Atualizar `Version` em `src/FlowOnRails/FlowOnRails.csproj`, se necessário, e revisar as alterações incompatíveis documentadas no README.
-2. Enviar a branch de desenvolvimento e obter CI aprovado para o código que será lançado.
-3. Integrar o código e os workflows à `main`. O CD ainda não está presente na `main` no momento desta revisão; publicar uma release da `main` antiga não disponibiliza o fluxo novo.
-4. Confirmar a política ativa no NuGet e que a versão ainda não existe no feed.
-5. Criar uma release no GitHub apontando para o commit revisado, com tag correspondente à versão do projeto; para esta versão, `v0.2.0`.
-6. Publicar a release quando quiser disparar o envio. Conferir o resultado do workflow e a disponibilização/indexação do pacote no NuGet.
+Para o primeiro satélite, a tag preparada é `aspnetcore/v0.1.0`. A versão `0.2.0`
+da base não precisa ser republicada. O envio de uma versão que já existe no NuGet
+falha: o workflow não ignora esse conflito. A configuração local e os testes de
+consumo não substituem a execução real de autenticação e envio no GitHub Actions.
 
-A publicação da release é o passo que autoriza o envio automático. Não é necessário fazer um push manual do pacote pelo computador.
-
-## Estado verificado em 02/11/2026
-
-- A 0.1.0 está disponível no [NuGet](https://www.nuget.org/packages/FlowOnRails).
-- A [issue #1 — Add cd for nuget deploy](https://github.com/Alguem5381/FlowOnRails/issues/1) continua aberta.
-- O GitHub exibe duas execuções antigas bem-sucedidas de CI para `main`; isso não valida as alterações atuais da 0.2.0.
-- Os workflows atualizados incluem testes antes da publicação e conferência da tag.
-- O login da conta `alguem5381` e a política Trusted Publishing `FlowOnRails` foram conferidos no navegador: política ativa, proprietário GitHub `alguem5381`, repositório `FlowOnRails`, workflow `cd.yml`, sem ambiente declarado. O escopo existente permite novos pacotes e versões com padrão `*`; nenhuma permissão foi criada ou alterada nesta revisão.
-- Restore, build em Release, 547 testes e geração do pacote 0.2.0 passaram localmente, sem avisos no build.
-- O passo de conferência de versão aceitou `v0.2.0` e `0.2.0` e rejeitou `v0.1.0`. YAML, comandos de shell e gatilhos foram validados.
-- O envio da branch atual, o CI remoto e a execução real do CD ainda precisam ocorrer antes de considerar a publicação concluída. A troca do token OIDC só pode ser validada em uma execução do GitHub Actions.
-
-Referência do gatilho: [GitHub Actions — release](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release).
+Referência do evento: [GitHub Actions — release](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release).

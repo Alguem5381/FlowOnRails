@@ -6,7 +6,9 @@
 
 - `WithErrorVisibility` for Minimal API endpoints and nested route groups, with endpoint-to-global precedence and independent immutable configuration snapshots.
 
-- Initial `FlowOnRails.AspNetCore` project with tree-based error visibility, ancestor projection candidates, exact-controller overrides, validated immutable configuration and ASP.NET endpoint metadata integration. HTTP translation and package publication are deferred.
+- Initial `FlowOnRails.AspNetCore` integration with tree-based error visibility, ancestor projection candidates, exact-controller overrides, validated immutable configuration and ASP.NET endpoint metadata integration.
+- Exact HTTP mappings, generated automatic property projectors, manual extensions, request-aware generic problems and native HTTP/MVC result adapters.
+- `FlowOnRails.AspNetCore` 0.1.0 packaging with the source generator included, public usage documentation and independent `aspnetcore/v<version>` release tags. Package consumption is validated through isolated consumers; satellite releases also verify the published base dependency before upload.
 
 - `TapError` and Task/ValueTask `TapErrorAsync` to observe the original error on failure while preserving the rail. Asynchronous observers are awaited.
 - Lazy `Ensure` / `EnsureAsync` error-factory overloads, allowing errors to include the current value and creating them only when the predicate fails.

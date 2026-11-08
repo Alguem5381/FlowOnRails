@@ -199,14 +199,14 @@ Task and ValueTask extensions provide `RecoverAsync` for typed replacement value
 
 See [operation semantics](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/operation-semantics.md) for the current contract. Semantic success records are deferred; the rationale and archived implementation are described in the [design note](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/design/semantic-success.md). Domain result variants belong in the application's value types.
 
-## ASP.NET Core integration in development
+## ASP.NET Core integration
 
-The separate `FlowOnRails.AspNetCore` project now contains an error visibility
+The separate `FlowOnRails.AspNetCore` package contains an error visibility
 policy with explicit global, controller, endpoint and route-group rules, backed
 by immutable indexes. It also implements exact HTTP translations, generated property
-projectors and native HTTP/MVC result adapters. The satellite is not yet published.
-See the [integration guide and runnable sample](src/FlowOnRails.AspNetCore/README.md)
-and the [visibility design](docs/design/aspnetcore-visibility.md).
+projectors and native HTTP/MVC result adapters. The source generator is included
+in the satellite package, which depends on the base library.
+See the [integration guide and runnable sample](https://github.com/Alguem5381/FlowOnRails/blob/main/src/FlowOnRails.AspNetCore/README.md).
 
 ## Contributing
 
