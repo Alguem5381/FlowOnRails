@@ -5,10 +5,31 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <IsPackable>false</IsPackable>
+    <PackageId>FlowOnRails.AspNetCore</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>alguem5381</Authors>
+    <Description>ASP.NET Core integration for FlowOnRails with scoped error visibility, generated ProblemDetails mappings and native HTTP/MVC result adapters.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>aspnetcore problemdetails result error-handling source-generator</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/Alguem5381/FlowOnRails</RepositoryUrl>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeProblemGenerator</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../FlowOnRails/FlowOnRails.csproj" />
+    <ProjectReference Include="../FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj"
+                      ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
+  <Target Name="IncludeProblemGenerator">
+    <MSBuild Projects="../FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj"
+             Targets="GetTargetPath" Properties="Configuration=$(Configuration)" RemoveProperties="TargetFramework">
+      <Output TaskParameter="TargetOutputs" ItemName="_ProblemGenerator" />
+    </MSBuild>
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(_ProblemGenerator)" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
 </Project>

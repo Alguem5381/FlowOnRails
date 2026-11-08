@@ -1,7 +1,6 @@
 # FlowOnRails.AspNetCore
 
-ASP.NET Core integration for FlowOnRails (.NET 10 / C# 14), under development.
-The runtime and generator are not yet packaged or published.
+ASP.NET Core integration for FlowOnRails (.NET 10 / C# 14).
 
 The implementation combines an immutable visibility policy, exact HTTP mappings,
 generated property projectors and native HTTP/MVC result adapters. The base
@@ -27,12 +26,20 @@ Try these paths:
 | `GET /minimal/empty` | 204 without a body |
 
 The sample emits generated sources under `obj`, so its registration and projectors
-can also be inspected. See [ApiProblems](../../samples/FlowOnRails.AspNetCore.Sample/ApiProblems.cs)
-and [Program](../../samples/FlowOnRails.AspNetCore.Sample/Program.cs).
+can also be inspected. See [ApiProblems](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOnRails.AspNetCore.Sample/ApiProblems.cs)
+and [Program](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOnRails.AspNetCore.Sample/Program.cs).
 
-## Reference the runtime and generator
+## Install the package
 
-While the packages are being developed, a consuming project needs both references:
+```sh
+dotnet add package FlowOnRails.AspNetCore --version 0.1.0
+```
+
+The package depends on `FlowOnRails` and includes the generator as a C# analyzer.
+No separate generator package or runtime dependency on Roslyn is required. Use the
+.NET 10 SDK (Roslyn 5 / C# 14) or a compatible newer compiler.
+
+For development directly from source, reference both projects:
 
 ```xml
 <ItemGroup>
@@ -60,6 +67,52 @@ for explicit registration without generation; generated code uses that same API.
 
 A missing required DI registration is a configuration error. An authorized error
 without a mapping uses the generic problem; these are separate situations.
+
+## Configure error visibility
+
+Errors use the generic problem by default. Visibility rules determine which error
+contract may supply response data; a mapping defines how that contract is translated.
+
+| Selection | Selected errors |
+|---|---|
+| `For<TError>()` | Exactly `TError` |
+| `ForDescendantsOf<TError>()` | Descendants, excluding `TError` |
+| `ForTree<TError>()` | `TError` and its descendants |
+
+Choose `TranslateEachType()` to use each selected error's own map, or
+`UseGenericProblem()` to return the configured generic problem.
+`UseNearestAncestorMapping()` searches outside the selected range for an ancestor
+whose translation contract is authorized. It exposes that ancestor's configured
+properties rather than collecting the concrete error's properties.
+
+Global rules apply across the application. Use `ForController<TController>` for an
+exact controller type; derived controllers do not inherit those overrides:
+
+```csharp
+builder.Services.AddFlowOnRailsVisibility(policy =>
+{
+    policy.Global.ForTree<PublicError>().TranslateEachType();
+    policy.ForController<UsersController>(scope =>
+        scope.For<UserNotFound>().UseGenericProblem());
+});
+```
+
+For Minimal APIs, apply `WithErrorVisibility` to an endpoint or route group:
+
+```csharp
+var users = app.MapGroup("/users")
+    .WithErrorVisibility(scope => scope.ForTree<PublicError>().UseGenericProblem());
+
+users.MapGet("/{id:int}", (int id, UserService service) =>
+    service.Find(id).ToHttpResult(Results.Ok));
+```
+
+Matching rules are considered in this order: endpoint, innermost to outermost route
+group, exact controller, then global. A scope with no matching rule falls through
+to the next scope. Within a scope, the nearest configured root wins; at the same
+root, exact selection takes precedence over descendants, then the whole tree.
+Conflicting rules and attempts to reopen a generic exclusion within the same scope
+are rejected during configuration.
 
 ## Declare mappings in the HTTP layer
 
@@ -198,23 +251,3 @@ such as `SomeError<int>` and `SomeError<int?>` remain separate contracts.
 Configuration-body conflicts, such as manually configuring extensions on a map
 marked automatic, are rejected during catalog registration. Arbitrary C# callback
 bodies are not executed or fully interpreted by the generator.
-
-The generator emits the registration API as normal source output and places internal
-projectors/registration implementation in `RegisterImplementationSourceOutput`.
-The host controls scheduling; this does not promise build-only execution. Generated
-source hints are deterministic and bounded for hosts that persist files.
-
-## Current boundaries
-
-Mappings are exact and global. Field inheritance and translation overrides per
-controller/group/endpoint are deferred; visibility retains all its existing scopes.
-OpenAPI error coverage, localization, conditional empty/null omission, dynamic
-assembly/plugin discovery, NuGet packaging and Native AOT guarantees are outside
-this first implementation. The adapters translate failed rails; exceptions remain
-with the application's exception-handling pipeline.
-
-See the [visibility design](../../docs/design/aspnetcore-visibility.md) and
-[endpoint conventions](../../docs/aspnetcore-endpoint-conventions.md) for the
-unchanged policy rules. Complete generated-catalog and HTTP/MVC examples are tested
-in `FlowOnRails.AspNetCore.Tests`; compilation/diagnostic cases are in
-`FlowOnRails.AspNetCore.Generators.Tests`.

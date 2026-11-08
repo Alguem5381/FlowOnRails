@@ -2,7 +2,9 @@
 
 Incremental Roslyn generator for the exact HTTP mappings in FlowOnRails.AspNetCore.
 Targets netstandard2.0 and uses Roslyn 5.0 to support the solution's .NET 10/C# 14
-consumer syntax. Reference it as an analyzer, not as a runtime assembly.
+consumer syntax. It is bundled under `analyzers/dotnet/cs` in the
+`FlowOnRails.AspNetCore` NuGet package; no separate generator package is needed.
+When developing from source, reference it as an analyzer, not as a runtime assembly.
 
 The generator finds attributed configuration classes, validates methods and static
 metadata, resolves explicitly mapped closed contracts from selected assemblies and
