@@ -49,7 +49,7 @@ public sealed class ProblemGenerator : IIncrementalGenerator
 
         var invalidContainers = context.SyntaxProvider.ForAttributeWithMetadataName(
                 Prefix + "ErrorAssemblyAttribute",
-                static (node, _) => node is not ClassDeclarationSyntax,
+                static (node, _) => node is not TypeDeclarationSyntax,
                 static (syntax, _) => Diagnostic.Create(InvalidClass, syntax.TargetNode.GetLocation(), syntax.TargetSymbol.Name));
         context.RegisterSourceOutput(invalidContainers, static (output, diagnostic) => output.ReportDiagnostic(diagnostic));
 
@@ -79,13 +79,13 @@ public sealed class ProblemGenerator : IIncrementalGenerator
     }
 
     private static bool IsCandidate(SyntaxNode node) =>
-        node is ClassDeclarationSyntax declaration &&
+        node is TypeDeclarationSyntax declaration &&
         (declaration.AttributeLists.Count > 0 ||
          declaration.Members.OfType<MethodDeclarationSyntax>().Any(method => method.AttributeLists.Count > 0));
 
     private static Profile? BuildProfile(GeneratorSyntaxContext syntax, CancellationToken cancellation)
     {
-        var declaration = (ClassDeclarationSyntax)syntax.Node;
+        var declaration = (TypeDeclarationSyntax)syntax.Node;
         var type = syntax.SemanticModel.GetDeclaredSymbol(declaration, cancellation);
 
         if (type is null)
@@ -114,7 +114,8 @@ public sealed class ProblemGenerator : IIncrementalGenerator
         var location = declaration.Identifier.GetLocation();
         var declarations = type.DeclaringSyntaxReferences.Select(reference => reference.GetSyntax(cancellation));
 
-        if (!type.IsStatic || type.IsGenericType || type.ContainingType is not null || type.IsFileLocal ||
+        if (declaration is not ClassDeclarationSyntax ||
+            !type.IsStatic || type.IsGenericType || type.ContainingType is not null || type.IsFileLocal ||
             declarations.OfType<ClassDeclarationSyntax>().Any(part => !part.Modifiers.Any(SyntaxKind.PartialKeyword)))
         {
             diagnostics.Add(Diagnostic.Create(InvalidClass, location, type.Name));

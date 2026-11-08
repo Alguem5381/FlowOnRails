@@ -92,6 +92,32 @@ public class GeneratorTests
     }
 
     [Theory]
+    [InlineData("partial record")]
+    [InlineData("partial record struct")]
+    [InlineData("partial struct")]
+    [InlineData("partial interface")]
+    public void ConfigurationMethodsInUnsupportedContainers_AreDiagnosed(string container)
+    {
+        var source = Imports + $$"""
+            public record E : Error;
+            public {{container}} Problems {
+                [HttpProblem(400), AutomaticExtensions]
+                private static void Configure(ProblemBuilder<E> p) { }
+                [GenericProblem]
+                private static void Fallback(GenericProblemBuilder p) { }
+            }
+            """;
+        var result = Generate(source);
+
+        var diagnostic = Assert.Single(result.GeneratorDiagnostics);
+        Assert.Equal("FORHTTP002", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.True(diagnostic.Location.IsInSource);
+        Assert.DoesNotContain(CreateCompilation(source).GetDiagnostics(), item => item.Severity == DiagnosticSeverity.Error);
+        Assert.Empty(result.Code);
+    }
+
+    [Theory]
     [InlineData("[UseDataField]", "private static void Configure(ProblemBuilder<E> p) { }")]
     [InlineData("[AutomaticExtensions]", "private static void Configure(ProblemBuilder<E> p) { }")]
     [InlineData("[HttpProblem(400), UseDataField]", "private static void Configure(ProblemBuilder<E> p) { }")]
