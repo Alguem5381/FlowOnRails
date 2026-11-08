@@ -141,13 +141,6 @@ public sealed class ProblemGenerator : IIncrementalGenerator
             assemblies.Add(anchor.ContainingAssembly);
         }
 
-        var known = new SortedSet<string>(StringComparer.Ordinal);
-
-        foreach (var assembly in assemblies)
-        foreach (var candidate in Enumerate(assembly.GlobalNamespace, cancellation))
-            if (!IsOpen(candidate) && DerivesFrom(candidate, errorBase) && compilation.IsSymbolAccessibleWithin(candidate, type))
-                known.Add(Name(candidate));
-
         var maps = new List<Map>();
         var targets = new HashSet<string>(StringComparer.Ordinal);
         var genericCount = 0;
@@ -226,7 +219,6 @@ public sealed class ProblemGenerator : IIncrementalGenerator
             }
 
             var errorName = Name(error);
-            known.Add(errorName);
 
             if (!targets.Add(errorName))
                 diagnostics.Add(Diagnostic.Create(Duplicate, methodLocation, "More than one mapping targets '" + errorName + "'."));
@@ -240,7 +232,7 @@ public sealed class ProblemGenerator : IIncrementalGenerator
         if (diagnostics.Any(item => item.Severity == DiagnosticSeverity.Error))
             return new(null, diagnostics.ToImmutable());
 
-        return new(Emit(type, maps, known), diagnostics.ToImmutable());
+        return new(Emit(type, maps), diagnostics.ToImmutable());
     }
 
     private static string Project(
@@ -292,7 +284,7 @@ public sealed class ProblemGenerator : IIncrementalGenerator
         return code.ToString();
     }
 
-    private static Sources Emit(INamedTypeSymbol profile, List<Map> maps, SortedSet<string> known)
+    private static Sources Emit(INamedTypeSymbol profile, List<Map> maps)
     {
         var ns = profile.ContainingNamespace.IsGlobalNamespace ? null : profile.ContainingNamespace.ToDisplayString();
         var access = profile.DeclaredAccessibility == Accessibility.Public ? "public" : "internal";
@@ -313,9 +305,7 @@ public sealed class ProblemGenerator : IIncrementalGenerator
             .AppendLine("    static partial void __FlowOnRailsRegister(global::Microsoft.Extensions.DependencyInjection.IServiceCollection services)")
             .AppendLine("    {")
             .AppendLine("        global::Microsoft.Extensions.DependencyInjection.TranslationServiceExtensions.AddFlowOnRailsTranslation(services, catalog =>")
-            .AppendLine("        {")
-            .Append("            catalog.Discover(");
-        implementation.Append(string.Join(", ", known.Select(name => "typeof(" + name + ")"))).AppendLine(");");
+            .AppendLine("        {");
 
         for (var index = 0; index < maps.Count; index++)
         {
@@ -357,27 +347,6 @@ public sealed class ProblemGenerator : IIncrementalGenerator
             string.Concat(digest.Select(value => value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture)));
 
         return new(hint, entry.ToString(), implementation.ToString());
-    }
-
-    private static IEnumerable<INamedTypeSymbol> Enumerate(INamespaceOrTypeSymbol container, CancellationToken cancellation)
-    {
-        foreach (var member in container.GetMembers())
-        {
-            cancellation.ThrowIfCancellationRequested();
-
-            if (member is INamespaceSymbol ns)
-            {
-                foreach (var nested in Enumerate(ns, cancellation))
-                    yield return nested;
-            }
-            else if (member is INamedTypeSymbol type)
-            {
-                yield return type;
-
-                foreach (var nested in Enumerate(type, cancellation))
-                    yield return nested;
-            }
-        }
     }
 
     private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol root)

@@ -34,11 +34,31 @@ public class GeneratorTests
         var result = Generate(source);
 
         AssertNoErrors(result);
-        Assert.Contains("typeof(global::FlowOnRails.TestDomain.DomainNotFound)", result.Code);
+        Assert.DoesNotContain("global::FlowOnRails.TestDomain.DomainNotFound", result.Code);
         Assert.Contains("catalog.Add<global::FlowOnRails.TestDomain.UserNotFound>", result.Code);
         Assert.Contains("global::FlowOnRails.TestDomain.ValidationError<int>", result.Code);
         Assert.Contains("@ArbitraryName", result.Code);
         Assert.Contains("__FlowOnRailsRegister", result.Code);
+    }
+
+    [Theory]
+    [InlineData("file record Unmapped : Error;")]
+    [InlineData("file class Hidden { public record Unmapped : Error; }")]
+    [InlineData("[System.Obsolete(\"Retired\", true)] public record Unmapped : Error;")]
+    [InlineData("[System.Obsolete(\"Retired\")] public record Unmapped : Error;")]
+    public void UnmappedContracts_DoNotIntroduceReferencesOrCompilerDiagnostics(string declaration)
+    {
+        var result = Generate(Imports + declaration + """
+            public record E : Error;
+            public static partial class Problems {
+                [HttpProblem(400)] private static void Configure(ProblemBuilder<E> p) { }
+            }
+            """);
+
+        AssertNoErrors(result);
+        Assert.DoesNotContain(result.Compilation.GetDiagnostics(), item => item.Id is "CS0618" or "CS0619");
+        Assert.DoesNotContain("Unmapped", result.Code);
+        Assert.Contains("catalog.Add<global::Consumer.E>", result.Code);
     }
 
     [Theory]

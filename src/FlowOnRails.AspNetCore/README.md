@@ -110,9 +110,10 @@ the current occurrence. Each response gets a new ProblemDetails and extensions.
 
 `ErrorAssembly` can be repeated for multiple domain assemblies. Any accessible
 marker type identifies its assembly; it does not select a subtree. The current
-assembly is included automatically. Discovery uses compilation symbols, without
-loading assemblies at runtime or guessing endpoint return paths. Only selected
-assemblies are inspected; transitive references are not automatically included.
+assembly is included automatically. Mapping discovery uses compilation symbols,
+without loading assemblies at runtime or guessing endpoint return paths. Only
+contracts explicitly mapped from selected assemblies are referenced in generated
+code; unrelated file-local or obsolete errors do not affect registration.
 Only mapped automatic contracts need generated projectors. Closed generic contracts
 can appear explicitly in mapping signatures; open generic definitions are not maps.
 
