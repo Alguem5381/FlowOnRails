@@ -30,5 +30,14 @@ jobs:
       - name: Test
         run: dotnet test FlowOnRails.slnx --configuration Release --no-build --no-restore --verbosity normal
 
-      - name: Validate package
-        run: dotnet pack src/FlowOnRails/FlowOnRails.csproj --configuration Release --no-build --no-restore --output ./nupkg
+      - name: Test release selection
+        run: python3 -m unittest discover -s tests/packaging -p 'test_*.py'
+
+      - name: Pack base library
+        run: dotnet pack src/FlowOnRails/FlowOnRails.csproj --configuration Release --no-build --no-restore --output ./artifacts/packages
+
+      - name: Pack ASP.NET Core integration
+        run: dotnet pack src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj --configuration Release --no-build --no-restore --output ./artifacts/packages
+
+      - name: Verify isolated package consumers
+        run: python3 scripts/verify-packages.py ./artifacts/packages
