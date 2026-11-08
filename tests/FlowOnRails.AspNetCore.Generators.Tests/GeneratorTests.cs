@@ -248,6 +248,22 @@ public class GeneratorTests
         Assert.Single(driver.GetRunResult().Results.Single().GeneratedSources);
     }
 
+    [Fact]
+    public void PersistedSourceHints_AreBoundedAndDeterministicForLongNamespaces()
+    {
+        var source = Imports.Replace("namespace Consumer;", "namespace " + new string('N', 180) + ";", StringComparison.Ordinal) +
+            "public record E : Error; public static partial class Problems { " +
+            "[HttpProblem(400)] private static void Configure(ProblemBuilder<E> p) { } }";
+        var compilation = CreateCompilation(source);
+        var options = (CSharpParseOptions)compilation.SyntaxTrees.Single().Options;
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(new[] { new ProblemGenerator().AsSourceGenerator() }, parseOptions: options);
+        var first = driver.RunGenerators(compilation).GetRunResult().Results.Single().GeneratedSources;
+        var second = driver.RunGenerators(compilation).GetRunResult().Results.Single().GeneratedSources;
+
+        Assert.Equal(first.Select(item => item.HintName), second.Select(item => item.HintName));
+        Assert.All(first, item => Assert.InRange(item.HintName.Length, 1, 160));
+    }
+
     private static void AssertNoErrors(Generated result)
     {
         Assert.DoesNotContain(result.GeneratorDiagnostics, item => item.Severity == DiagnosticSeverity.Error);

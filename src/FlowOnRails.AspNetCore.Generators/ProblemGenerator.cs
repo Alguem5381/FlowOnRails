@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
@@ -329,8 +330,11 @@ public sealed class ProblemGenerator : IIncrementalGenerator
         }
 
         implementation.AppendLine("}");
-        // Encoded fully-qualified names avoid hint collisions without unstable hashes.
-        var hint = string.Concat(Name(profile).Select(character => ((int)character).ToString("x4", System.Globalization.CultureInfo.InvariantCulture)));
+        // Bound file names for hosts that persist generated sources, including long namespaces.
+        using var hash = SHA256.Create();
+        var digest = hash.ComputeHash(Encoding.UTF8.GetBytes(Name(profile)));
+        var hint = profile.Name.Substring(0, Math.Min(profile.Name.Length, 32)) + "." +
+            string.Concat(digest.Select(value => value.ToString("x2", System.Globalization.CultureInfo.InvariantCulture)));
 
         return new(hint, entry.ToString(), implementation.ToString());
     }
