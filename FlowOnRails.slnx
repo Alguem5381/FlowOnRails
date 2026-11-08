@@ -32,6 +32,10 @@
     <Project Path="src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj" />
   </Folder>
 
+  <Folder Name="/samples/">
+    <Project Path="samples/FlowOnRails.AspNetCore.Sample/FlowOnRails.AspNetCore.Sample.csproj" />
+  </Folder>
+
   <Folder Name="/tests/">
     <Project Path="tests/FlowOnRails.AspNetCore.Generators.Tests/FlowOnRails.AspNetCore.Generators.Tests.csproj" />
     <Project Path="tests/FlowOnRails.TestDomain/FlowOnRails.TestDomain.csproj" />
