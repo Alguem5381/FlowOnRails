@@ -1,33 +1,12 @@
 # FlowOnRails.AspNetCore
 
-ASP.NET Core integration for FlowOnRails (.NET 10 / C# 14).
+FlowOnRails.AspNetCore is the first satellite library for FlowOnRails. It connects
+`Rail` and `RailFor<T>` to ASP.NET Core endpoints, letting each endpoint describe
+its successful response while configured domain errors become HTTP ProblemDetails.
 
-The implementation combines an immutable visibility policy, exact HTTP mappings,
-generated property projectors and native HTTP/MVC result adapters. The base
-FlowOnRails library remains independent of ASP.NET Core.
-
-## Try the sample
-
-From the repository root:
-
-```sh
-dotnet run --project samples/FlowOnRails.AspNetCore.Sample --urls http://localhost:5080
-```
-
-Try these paths:
-
-| Request | Result |
-|---|---|
-| `GET /minimal/users/1` | 200 with a user |
-| `GET /minimal/users/2` | 404 with automatic properties under `data`, including `Reason: null` |
-| `GET /minimal/users/0` | 422 with manually configured extensions |
-| `GET /minimal/hidden/2` | The configured generic 500 without domain properties |
-| `GET /mvc/users/1` | Native MVC response; accepts XML when requested |
-| `GET /minimal/empty` | 204 without a body |
-
-The sample emits generated sources under `obj`, so its registration and projectors
-can also be inspected. See [ApiProblems](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOnRails.AspNetCore.Sample/ApiProblems.cs)
-and [Program](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOnRails.AspNetCore.Sample/Program.cs).
+Visibility rules control which error data may appear in a response. Mappings define
+the HTTP status, problem fields and extensions, keeping HTTP configuration in the
+application's API layer and out of the domain.
 
 ## Install the package
 
@@ -39,17 +18,7 @@ The package depends on `FlowOnRails` and includes the generator as a C# analyzer
 No separate generator package or runtime dependency on Roslyn is required. Use the
 .NET 10 SDK (Roslyn 5 / C# 14) or a compatible newer compiler.
 
-For development directly from source, reference both projects:
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="path/to/FlowOnRails.AspNetCore.csproj" />
-  <ProjectReference Include="path/to/FlowOnRails.AspNetCore.Generators.csproj"
-                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-</ItemGroup>
-```
-
-## Keep visibility and translation separate
+## Configure the integration
 
 ```csharp
 using FlowOnRails.AspNetCore.Translation;
@@ -68,13 +37,44 @@ for explicit registration without generation; generated code uses that same API.
 A missing required DI registration is a configuration error. An authorized error
 without a mapping uses the generic problem; these are separate situations.
 
+## Describe success in the endpoint
+
+```csharp
+// Minimal API, including custom files/text/created/accepted results:
+return result.ToHttpResult(value => Results.Ok(value));
+
+// Controller, preserving native MVC execution and output formatters:
+return result.ToActionResult(value => Ok(value));
+
+// Rail without a value:
+return result.ToHttpResult(() => Results.NoContent());
+```
+
+Factories run once on success, during conversion, and are skipped on failure.
+They must return a non-null result. `ToActionResult` returns `ActionResult`, usable
+as `IActionResult` or through the standard conversion to `ActionResult<T>`.
+A custom `IActionResult` is executed using its original MVC ActionContext.
+
+On failure, execution resolves the translator and policy from the current request's
+services. Endpoint/group/controller metadata selects the authorized contract. The
+first candidate with an exact map is projected; no candidate/map uses the fallback.
+Generic configuration receives request data, not the hidden domain error. Without a
+custom generic mapping, the response is a neutral 500 with no domain properties.
+
+The HTTP path uses `IProblemDetailsService` if registered and accepted by a writer;
+otherwise it writes `application/problem+json` with the HTTP JSON options. This
+fallback also applies when no writer accepts the request's media types. The MVC
+path uses ObjectResult and MVC formatters. Both support ProblemDetails customization;
+application customizers/writers can subsequently change the output. Started
+responses cannot be replaced by a domain failure.
+
 ## Configure error visibility
 
 Errors use the generic problem by default. Visibility rules determine which error
 contract may supply response data; a mapping defines how that contract is translated.
 
 | Selection | Selected errors |
-|---|---|
+| --- | --- |
 | `For<TError>()` | Exactly `TError` |
 | `ForDescendantsOf<TError>()` | Descendants, excluding `TError` |
 | `ForTree<TError>()` | `TError` and its descendants |
@@ -199,41 +199,45 @@ not become domain errors. Complex object serialization remains the application's
 responsibility. A non-boxable property, such as a Span, requires manual projection
 and is diagnosed rather than producing broken generated code.
 
-## Describe success in the endpoint
+## Develop from source
 
-```csharp
-// Minimal API, including custom files/text/created/accepted results:
-return result.ToHttpResult(value => Results.Ok(value));
+For development directly from source, reference both projects:
 
-// Controller, preserving native MVC execution and output formatters:
-return result.ToActionResult(value => Ok(value));
-
-// Rail without a value:
-return result.ToHttpResult(() => Results.NoContent());
+```xml
+<ItemGroup>
+  <ProjectReference Include="path/to/FlowOnRails.AspNetCore.csproj" />
+  <ProjectReference Include="path/to/FlowOnRails.AspNetCore.Generators.csproj"
+                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+</ItemGroup>
 ```
 
-Factories run once on success, during conversion, and are skipped on failure.
-They must return a non-null result. `ToActionResult` returns `ActionResult`, usable
-as `IActionResult` or through the standard conversion to `ActionResult<T>`.
-A custom `IActionResult` is executed using its original MVC ActionContext.
+## Try the sample
 
-On failure, execution resolves the translator and policy from the current request's
-services. Endpoint/group/controller metadata selects the authorized contract. The
-first candidate with an exact map is projected; no candidate/map uses the fallback.
-Generic configuration receives request data, not the hidden domain error. Without a
-custom generic mapping, the response is a neutral 500 with no domain properties.
+From the repository root:
 
-The HTTP path uses `IProblemDetailsService` if registered and accepted by a writer;
-otherwise it writes `application/problem+json` with the HTTP JSON options. This
-fallback also applies when no writer accepts the request's media types. The MVC
-path uses ObjectResult and MVC formatters. Both support ProblemDetails customization;
-application customizers/writers can subsequently change the output. Started
-responses cannot be replaced by a domain failure.
+```sh
+dotnet run --project samples/FlowOnRails.AspNetCore.Sample --urls http://localhost:5080
+```
+
+Try these paths:
+
+| Request | Result |
+| --- | --- |
+| `GET /minimal/users/1` | 200 with a user |
+| `GET /minimal/users/2` | 404 with automatic properties under `data`, including `Reason: null` |
+| `GET /minimal/users/0` | 422 with manually configured extensions |
+| `GET /minimal/hidden/2` | The configured generic 500 without domain properties |
+| `GET /mvc/users/1` | Native MVC response; accepts XML when requested |
+| `GET /minimal/empty` | 204 without a body |
+
+The sample emits generated sources under `obj`, so its registration and projectors
+can also be inspected. See [ApiProblems](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOnRails.AspNetCore.Sample/ApiProblems.cs)
+and [Program](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOnRails.AspNetCore.Sample/Program.cs).
 
 ## Generator diagnostics
 
 | ID | Default severity | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | FORHTTP001 | Error | Unsupported configuration method signature |
 | FORHTTP002 | Error | Unsupported configuration class |
 | FORHTTP003 | Error | Orphan/incompatible mapping or projection attributes |
