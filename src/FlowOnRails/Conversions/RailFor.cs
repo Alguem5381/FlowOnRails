@@ -9,5 +9,5 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     public static implicit operator Rail(RailFor<TValue> rail) =>
         rail.IsSuccess
             ? Rail.Ok()
-            : Rail.Fail(rail.Error!);
+            : Rail.Fail(rail.Error);
 }

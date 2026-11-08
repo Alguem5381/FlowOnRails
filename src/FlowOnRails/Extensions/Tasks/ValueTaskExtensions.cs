@@ -10,6 +10,79 @@ public static class ValueTaskExtensions
     extension(ValueTask<Rail> task)
     {
         /// <summary>
+        /// Awaits the source and creates an error only if the predicate fails on success.
+        /// </summary>
+        public async ValueTask<Rail> EnsureAsync(Func<bool> predicate, Func<Error> errorFactory)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Ensure(predicate, errorFactory);
+        }
+
+        /// <summary>
+        /// Observes the original error on failure after awaiting the source, preserving the rail.
+        /// </summary>
+        public async ValueTask<Rail> TapErrorAsync(Action<Error> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.TapError(action);
+        }
+
+        /// <summary>
+        /// Awaits an error observer on failure, preserving the rail.
+        /// </summary>
+        /// <remarks>Successful rails skip the callback. Exceptions and cancellation propagate.</remarks>
+        public async ValueTask<Rail> TapErrorAsync(Func<Error, ValueTask> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure)
+                await action(rail.Error).ConfigureAwait(false);
+
+            return rail;
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync(Func<Rail> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync(Func<ValueTask<Rail>> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync<TChecked>(Func<RailFor<TChecked>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async ValueTask<Rail> CheckAsync<TChecked>(Func<ValueTask<RailFor<TChecked>>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
         /// Matches the rail asynchronously and returns a value based on success or failure.
         /// </summary>
         public async ValueTask<TNext> MatchAsync<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure)
@@ -40,7 +113,7 @@ public static class ValueTaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var next = await bind().ConfigureAwait(false);
             return rail.Bind(() => next);
@@ -103,7 +176,7 @@ public static class ValueTaskExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var next = await fallback(rail.Error!).ConfigureAwait(false);
+            var next = await fallback(rail.Error).ConfigureAwait(false);
             return rail.RecoverWith(_ => next);
         }
 
@@ -123,7 +196,7 @@ public static class ValueTaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var value = await map().ConfigureAwait(false);
             return rail.Map(() => value);
@@ -147,7 +220,7 @@ public static class ValueTaskExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var error = await errorMapper(rail.Error!).ConfigureAwait(false);
+            var error = await errorMapper(rail.Error).ConfigureAwait(false);
             return rail.MapError(_ => error);
         }
     }

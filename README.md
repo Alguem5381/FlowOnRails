@@ -62,7 +62,15 @@ public RailFor<User> PrepareUser(int id)
 
 The callbacks can return `Rail` or `RailFor<T>`. `Check` is also available on an untyped `Rail`, which continues without a value. Use `Bind` when the next operation's value should replace the current value, `Ensure` for a predicate with a supplied error, and `Tap` for an action without a rail result.
 
-`Check` currently belongs to the synchronous core. Callback exceptions propagate, and uninitialized callback results are rejected.
+`CheckAsync` is available on `Task<Rail>`, `Task<RailFor<T>>`, `ValueTask<Rail>` and `ValueTask<RailFor<T>>`. Callbacks may return a synchronous rail or an awaitable rail from the same asynchronous family as the source. Both rail shapes are accepted, and the source shape and value are preserved.
+
+```csharp
+var result = await GetUserAsync(id)
+    .CheckAsync(user => ValidatePermissionsAsync(user))
+    .CheckAsync(user => ValidateAccount(user));
+```
+
+The source and any asynchronous check are awaited once. Callback exceptions and cancellation propagate; uninitialized callback results are rejected. A failed source skips the callback.
 
 ### Using LINQ
 
@@ -130,6 +138,40 @@ Migration from the previous signatures:
 - The two `BindAsync` overloads on `Task<RailFor<T>>` that accepted ValueTask callbacks are now named `BindValueTaskAsync`. Ordinary Task callbacks and `async` lambdas continue to use `BindAsync` without ambiguous overloads.
 - When mixing other callback types, convert explicitly at the boundary. A synchronous `MapAsync` overload can wrap an awaitable as a value, and an expression passed as `Action` can discard a returned awaitable. Keep compiler warnings enabled.
 
+### Contextual validation and error observation
+
+Pass an error factory to `Ensure` when the failure should include data from the
+current value:
+
+```csharp
+var result = Rail.Ok(user)
+    .Ensure(user => user.IsActive, user => new InactiveUserError(user.Id))
+    .TapError(error => Console.WriteLine(error));
+```
+
+The predicate runs only on success. The factory receives the same value and runs
+only when the predicate returns `false`. An existing failure skips both callbacks.
+The overload taking an already-created error remains available. Untyped `Rail`
+accepts a parameterless factory: `rail.Ensure(() => condition, () => new DomainError("Rejected"))`.
+Factories must return a non-null error; callback exceptions propagate.
+
+`TapError` observes the original error exactly once on failure and returns the
+original rail. Successful rails skip the observer. An observer exception
+propagates rather than replacing the domain error.
+
+Task and ValueTask sources provide `EnsureAsync` with the same synchronous
+predicate and error factory, and `TapErrorAsync` with a synchronous observer or an
+asynchronous observer from the source family:
+
+```csharp
+var result = await GetUserAsync(id)
+    .EnsureAsync(user => user.IsActive, user => new InactiveUserError(user.Id))
+    .TapErrorAsync(error => AuditFailureAsync(error));
+```
+
+Asynchronous observers are awaited before the pipeline continues. Each operation
+preserves the source family, and exceptions and cancellation propagate.
+
 ### Recovery
 
 Use `Recover` on `RailFor<T>` to produce a replacement value. Use `RecoverWith` to run a fallback that returns another rail, which may itself fail:
@@ -156,6 +198,15 @@ Task and ValueTask extensions provide `RecoverAsync` for typed replacement value
 - Factories reject null values and null errors. Callback exceptions and cancellation propagate rather than becoming domain errors.
 
 See [operation semantics](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/operation-semantics.md) for the current contract. Semantic success records are deferred; the rationale and archived implementation are described in the [design note](https://github.com/Alguem5381/FlowOnRails/blob/main/docs/design/semantic-success.md). Domain result variants belong in the application's value types.
+
+## ASP.NET Core integration
+
+The separate `FlowOnRails.AspNetCore` package contains an error visibility
+policy with explicit global, controller, endpoint and route-group rules, backed
+by immutable indexes. It also implements exact HTTP translations, generated property
+projectors and native HTTP/MVC result adapters. The source generator is included
+in the satellite package, which depends on the base library.
+See the [integration guide and runnable sample](https://github.com/Alguem5381/FlowOnRails/blob/main/src/FlowOnRails.AspNetCore/README.md).
 
 ## Contributing
 

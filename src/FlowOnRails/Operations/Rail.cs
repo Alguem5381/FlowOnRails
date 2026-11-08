@@ -20,7 +20,7 @@ public readonly partial struct Rail
     public bool TryUnwrap([NotNullWhen(false)] out Error? error)
     {
         var isSuccess = IsSuccess;
-        error = Error!;
+        error = Error;
         return isSuccess;
     }
 
@@ -38,6 +38,18 @@ public readonly partial struct Rail
     {
         if (IsSuccess)
             tap();
+
+        return this;
+    }
+
+    /// <summary>
+    /// Observes the original error on failure, preserving the rail.
+    /// </summary>
+    /// <remarks>Successful rails skip the callback. Callback exceptions propagate.</remarks>
+    public Rail TapError(Action<Error> tap)
+    {
+        if (IsFailure)
+            tap(Error);
 
         return this;
     }
@@ -72,7 +84,7 @@ public readonly partial struct Rail
         if (IsSuccess)
             return this;
 
-        var next = fallback(Error!);
+        var next = fallback(Error);
         _ = next.IsSuccess;
         return next;
     }
@@ -113,6 +125,20 @@ public readonly partial struct Rail
     }
 
     /// <summary>
+    /// Ensures the predicate holds, creating an error only when a successful rail fails the predicate.
+    /// </summary>
+    /// <remarks>Existing failures skip both callbacks. A null produced error is rejected; callback exceptions propagate.</remarks>
+    public Rail Ensure(Func<bool> predicate, Func<Error> errorFactory)
+    {
+        if (IsFailure)
+            return this;
+
+        return predicate()
+            ? this
+            : Fail(errorFactory());
+    }
+
+    /// <summary>
     /// Matches the rail and returns a value based on success or failure.
     /// </summary>
     /// <typeparam name="TNext">The return type.</typeparam>
@@ -129,7 +155,7 @@ public readonly partial struct Rail
     public TNext Match<TNext>(Func<TNext> onSuccess, Func<Error, TNext> onFailure) =>
         IsSuccess
             ? onSuccess()
-            : onFailure(Error!);
+            : onFailure(Error);
 
     /// <summary>
     /// Binds the rail to another rail that returns a value using the given function if successful.
@@ -137,7 +163,7 @@ public readonly partial struct Rail
     public RailFor<TNext> Bind<TNext>(Func<RailFor<TNext>> bind) where TNext : notnull
     {
         if (IsFailure)
-            return RailFor<TNext>.Fail(Error!);
+            return RailFor<TNext>.Fail(Error);
 
         var next = bind();
         _ = next.IsSuccess;
@@ -167,7 +193,7 @@ public readonly partial struct Rail
     public RailFor<TNext> Map<TNext>(Func<TNext> map) where TNext : notnull =>
         IsSuccess
             ? RailFor<TNext>.CreateSuccess(map())
-            : RailFor<TNext>.Fail(Error!);
+            : RailFor<TNext>.Fail(Error);
 
     /// <summary>
     /// Maps the error of a failed rail to another error synchronously.
@@ -175,5 +201,5 @@ public readonly partial struct Rail
     public Rail MapError(Func<Error, Error> errorMapper) =>
         IsSuccess
             ? this
-            : Fail(errorMapper(Error!));
+            : Fail(errorMapper(Error));
 }

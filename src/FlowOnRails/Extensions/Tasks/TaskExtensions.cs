@@ -10,6 +10,79 @@ public static class TaskExtensions
     extension(Task<Rail> task)
     {
         /// <summary>
+        /// Awaits the source and creates an error only if the predicate fails on success.
+        /// </summary>
+        public async Task<Rail> EnsureAsync(Func<bool> predicate, Func<Error> errorFactory)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Ensure(predicate, errorFactory);
+        }
+
+        /// <summary>
+        /// Observes the original error on failure after awaiting the source, preserving the rail.
+        /// </summary>
+        public async Task<Rail> TapErrorAsync(Action<Error> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.TapError(action);
+        }
+
+        /// <summary>
+        /// Awaits an error observer on failure, preserving the rail.
+        /// </summary>
+        /// <remarks>Successful rails skip the callback. Exceptions and cancellation propagate.</remarks>
+        public async Task<Rail> TapErrorAsync(Func<Error, Task> action)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure)
+                await action(rail.Error).ConfigureAwait(false);
+
+            return rail;
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync(Func<Rail> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync(Func<Task<Rail>> check)
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync<TChecked>(Func<RailFor<TChecked>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            return rail.Check(check);
+        }
+
+        /// <summary>
+        /// Checks another operation on success, preserving the source value, if any, and propagating failure.
+        /// </summary>
+        public async Task<Rail> CheckAsync<TChecked>(Func<Task<RailFor<TChecked>>> check)
+            where TChecked : notnull
+        {
+            var rail = await task.ConfigureAwait(false);
+            if (rail.IsFailure) return rail;
+            var next = await check().ConfigureAwait(false);
+            return rail.Check(() => next);
+        }
+
+        /// <summary>
         /// Matches the rail asynchronously and returns a value based on success or failure.
         /// </summary>
         /// <example>
@@ -53,7 +126,7 @@ public static class TaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var next = await bind().ConfigureAwait(false);
             return rail.Bind(() => next);
@@ -124,7 +197,7 @@ public static class TaskExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var next = await fallback(rail.Error!).ConfigureAwait(false);
+            var next = await fallback(rail.Error).ConfigureAwait(false);
             return rail.RecoverWith(_ => next);
         }
 
@@ -144,7 +217,7 @@ public static class TaskExtensions
         {
             var rail = await task.ConfigureAwait(false);
             if (rail.IsFailure)
-                return RailFor<TOut>.Fail(rail.Error!);
+                return RailFor<TOut>.Fail(rail.Error);
 
             var value = await map().ConfigureAwait(false);
             return rail.Map(() => value);
@@ -168,7 +241,7 @@ public static class TaskExtensions
             if (rail.IsSuccess)
                 return rail;
 
-            var error = await errorMapper(rail.Error!).ConfigureAwait(false);
+            var error = await errorMapper(rail.Error).ConfigureAwait(false);
             return rail.MapError(_ => error);
         }
     }

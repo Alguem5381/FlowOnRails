@@ -42,6 +42,20 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
                 : Fail(error);
 
     /// <summary>
+    /// Ensures the predicate holds, creating an error only when a successful rail fails the predicate.
+    /// </summary>
+    /// <remarks>Existing failures skip both callbacks. A null produced error is rejected; callback exceptions propagate.</remarks>
+    public RailFor<TValue> Ensure(Func<TValue, bool> predicate, Func<TValue, Error> errorFactory)
+    {
+        if (IsFailure)
+            return this;
+
+        return predicate(Value)
+            ? this
+            : Fail(errorFactory(Value));
+    }
+
+    /// <summary>
     /// Executes the given action if the rail is successful, passing the value.
     /// </summary>
     /// <param name="tap">The action to execute.</param>
@@ -50,6 +64,18 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     {
         if (IsSuccess)
             tap(Value);
+
+        return this;
+    }
+
+    /// <summary>
+    /// Observes the original error on failure, preserving the rail.
+    /// </summary>
+    /// <remarks>Successful rails skip the callback. Callback exceptions propagate.</remarks>
+    public RailFor<TValue> TapError(Action<Error> tap)
+    {
+        if (IsFailure)
+            tap(Error);
 
         return this;
     }
@@ -82,7 +108,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     public RailFor<TValue> Recover(Func<Error, TValue> recover) =>
         IsSuccess
             ? this
-            : CreateSuccess(recover(Error!));
+            : CreateSuccess(recover(Error));
 
     /// <summary>
     /// Replaces a failed rail with the rail returned by the fallback function.
@@ -92,7 +118,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
         if (IsSuccess)
             return this;
 
-        var next = fallback(Error!);
+        var next = fallback(Error);
         _ = next.IsSuccess;
         return next;
     }
@@ -115,7 +141,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     public TNext Match<TNext>(Func<TValue, TNext> onSuccess, Func<Error, TNext> onFailure) where TNext : notnull =>
         IsSuccess
             ? onSuccess(Value)
-            : onFailure(Error!);
+            : onFailure(Error);
 
     /// <summary>
     /// Maps the rail to another rail using the given function if successful.
@@ -130,7 +156,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     /// </example>
     public RailFor<TResult> Map<TResult>(Func<TValue, TResult> map) where TResult : notnull =>
         IsFailure
-            ? RailFor<TResult>.Fail(Error!)
+            ? RailFor<TResult>.Fail(Error)
             : RailFor<TResult>.CreateSuccess(map(Value));
 
     /// <summary>
@@ -148,7 +174,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     public RailFor<TResult> Bind<TResult>(Func<TValue, RailFor<TResult>> bind) where TResult : notnull
     {
         if (IsFailure)
-            return RailFor<TResult>.Fail(Error!);
+            return RailFor<TResult>.Fail(Error);
 
         var next = bind(Value);
         _ = next.IsSuccess;
@@ -161,7 +187,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     public Rail Bind(Func<TValue, Rail> bind)
     {
         if (IsFailure)
-            return Rail.Fail(Error!);
+            return Rail.Fail(Error);
 
         var next = bind(Value);
         _ = next.IsSuccess;
@@ -180,7 +206,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
             return this;
 
         var next = check(Value);
-        return next.IsFailure ? Fail(next.Error!) : this;
+        return next.IsFailure ? Fail(next.Error) : this;
     }
 
     /// <summary>
@@ -196,7 +222,7 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
             return this;
 
         var next = check(Value);
-        return next.IsFailure ? Fail(next.Error!) : this;
+        return next.IsFailure ? Fail(next.Error) : this;
     }
 
     /// <summary>
@@ -205,5 +231,5 @@ public readonly partial struct RailFor<TValue> where TValue : notnull
     public RailFor<TValue> MapError(Func<Error, Error> errorMapper) =>
         IsSuccess
             ? this
-            : Fail(errorMapper(Error!));
+            : Fail(errorMapper(Error));
 }
