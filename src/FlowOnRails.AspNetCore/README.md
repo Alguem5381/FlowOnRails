@@ -12,3 +12,10 @@ HTTP mappings and response helpers will build on this policy.
 
 See [the visibility design and examples](../../docs/design/aspnetcore-visibility.md)
 for configuration, precedence, controller scoping, and remaining work.
+
+Implementation files are grouped into `Configuration`, `Rules`, `Resolution` and
+`Integration`. The public namespace stays `FlowOnRails.AspNetCore.Visibility`;
+main entry points are `PolicyBuilder`, `RuleScope` and `ErrorPolicy`.
+
+For an explanation of ASP.NET's endpoint builders and our integration, see
+[endpoint conventions](../../docs/aspnetcore-endpoint-conventions.md).

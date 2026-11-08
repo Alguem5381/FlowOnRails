@@ -1,6 +1,6 @@
 # ASP.NET Core error visibility
 
-Status: implemented foundation, not yet a published package (updated 2026-11-04).
+Status: implemented foundation, not yet a published package (updated 2026-11-07).
 
 `FlowOnRails.AspNetCore` is separate from the base library. It selects which error
 contracts may be considered for HTTP translation. Status mappings, property
@@ -39,11 +39,31 @@ instead use ancestor contracts beginning with `NotFoundError`. The internal
 family requires a generic response. `UsersController` overrides the not-found
 family to require a generic response too.
 
-`VisibilityBuilder` organizes configuration and builds the policy. It has a
+`PolicyBuilder` organizes configuration and builds the policy. It has a
 `Global` scope instead of inheriting selector methods. Controller callbacks also
-receive a `VisibilityScope`. A `VisibilityTree` is a bounded specialization of
+receive a `RuleScope`. A `RuleTree` is a bounded specialization of
 that scope and adds a default behavior for the selected tree; it still supports
 narrower selections without duplicating the selector implementation.
+
+## Code organization and names
+
+Files are grouped by responsibility, keeping the public namespace
+`FlowOnRails.AspNetCore.Visibility` unchanged:
+
+| Folder | Responsibility | Main types |
+|---|---|---|
+| `Configuration` | Select error ranges and build the policy | `PolicyBuilder`, `RuleScope`, `RuleTree`, `RuleSelection` |
+| `Rules` | Describe a rule and its selected set | `RuleBehavior`; internal `Rule`, `ErrorSelection`, `ErrorRange` |
+| `Resolution` | Apply rules through immutable indexes | `ErrorPolicy`, `ExposureDecision`; internal `RuleIndex` |
+| `Integration` | Register services and attach/read endpoint metadata | Extension methods; internal `EndpointScopeMetadata` |
+
+Configuration and resolution types appearing in public method signatures remain
+public. Rule storage, indexing and metadata are internal implementation details.
+Folder organization does not add new imports to the fluent configuration API.
+The `Visibility` prefix is replaced by names describing each type's role.
+
+For the ASP.NET builder lifecycle behind the integration, see
+[endpoint conventions](../aspnetcore-endpoint-conventions.md).
 
 ## Select a type or family
 
@@ -83,7 +103,7 @@ A narrower own-translation rule can authorize an individual type. It does not
 make that type available to another error whose effective rule excludes that
 whole tree from ancestor candidates.
 
-Visibility returns a `VisibilityResolution`, containing `Behavior` and an
+Visibility returns a `ExposureDecision`, containing `Behavior` and an
 immutable `TranslationCandidates` list. It does not check whether mappings exist.
 The future translator must use the first candidate with a mapping, projecting
 that candidate's contract, never additional concrete-descendant properties.
@@ -174,7 +194,7 @@ There is no resolution cache and no claimed benchmark speedup.
 
 ```csharp
 var policy = httpContext.RequestServices
-    .GetRequiredService<VisibilityPolicy>();
+    .GetRequiredService<ErrorPolicy>();
 
 var resolution = policy.ResolveForRequest(error, httpContext);
 ```

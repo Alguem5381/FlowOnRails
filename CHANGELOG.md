@@ -15,7 +15,7 @@
 
 ### Changed
 
-- Simplified the unpublished ASP.NET visibility API to `Visibility*` names and explicit `builder.Global` configuration. Selection and conflict checks now use explicit cases rather than enum ordering.
+- Organized the unpublished ASP.NET visibility implementation into configuration, rules, resolution and integration. Role-based names such as `PolicyBuilder`, `RuleScope`, `ErrorPolicy` and `RuleIndex` replace repeated `Visibility*` prefixes. Shared configuration uses `builder.Global`; selection and conflict checks use explicit cases rather than enum ordering.
 - Visibility resolution uses frozen indexes by scope and error root, avoiding full rule scans and sorting during requests.
 
 - Internal error access is described by `MemberNotNullWhen` on state properties, removing null-forgiving operators after state checks while retaining runtime validation.
