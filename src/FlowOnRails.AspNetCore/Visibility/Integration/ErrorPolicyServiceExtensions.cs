@@ -3,7 +3,7 @@ using FlowOnRails.AspNetCore.Visibility;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>Registers the ASP.NET Core error visibility policy.</summary>
-public static class VisibilityServiceCollectionExtensions
+public static class ErrorPolicyServiceExtensions
 {
     extension(IServiceCollection services)
     {
@@ -13,17 +13,17 @@ public static class VisibilityServiceCollectionExtensions
         /// </summary>
         public IServiceCollection
             AddFlowOnRailsVisibility(
-                Action<VisibilityBuilder> configure
+                Action<PolicyBuilder> configure
             )
         {
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(configure);
 
-            if (services.Any(descriptor => descriptor.ServiceType == typeof(VisibilityPolicy)))
+            if (services.Any(descriptor => descriptor.ServiceType == typeof(ErrorPolicy)))
                 throw new InvalidOperationException(
                     "FlowOnRails visibility is already registered. Configure global and controller rules in the same registration.");
 
-            var builder = new VisibilityBuilder();
+            var builder = new PolicyBuilder();
 
             configure(builder);
             services.AddSingleton(builder.Build());

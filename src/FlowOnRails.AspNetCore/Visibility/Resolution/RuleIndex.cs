@@ -2,13 +2,13 @@ using System.Collections.Frozen;
 
 namespace FlowOnRails.AspNetCore.Visibility;
 
-internal sealed class VisibilityIndex(IEnumerable<VisibilityRule> rules)
+internal sealed class RuleIndex(IEnumerable<Rule> rules)
 {
     private readonly FrozenDictionary<Type, RootRules> _roots = rules
         .GroupBy(rule => rule.Selection.Root)
         .ToFrozenDictionary(group => group.Key, group => new RootRules(group));
 
-    internal VisibilityRule? FindRule(Type errorType)
+    internal Rule? FindRule(Type errorType)
     {
         for (
             var ancestor = errorType;
@@ -30,11 +30,11 @@ internal sealed class VisibilityIndex(IEnumerable<VisibilityRule> rules)
 
     private sealed class RootRules
     {
-        private readonly VisibilityRule? _exact;
-        private readonly VisibilityRule? _descendants;
-        private readonly VisibilityRule? _tree;
+        private readonly Rule? _exact;
+        private readonly Rule? _descendants;
+        private readonly Rule? _tree;
 
-        internal RootRules(IEnumerable<VisibilityRule> rules)
+        internal RootRules(IEnumerable<Rule> rules)
         {
             foreach (var rule in rules)
                 switch (rule.Selection.Range)
@@ -53,7 +53,7 @@ internal sealed class VisibilityIndex(IEnumerable<VisibilityRule> rules)
                 }
         }
 
-        internal VisibilityRule? Select(bool isRoot) =>
+        internal Rule? Select(bool isRoot) =>
             isRoot
                 ? _exact ?? _tree
                 : _descendants ?? _tree;

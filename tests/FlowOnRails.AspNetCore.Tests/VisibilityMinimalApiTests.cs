@@ -50,7 +50,7 @@ public class VisibilityMinimalApiTests
             ConfigureEndpoint();
         }
 
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Empty(Resolve(app, policy, "/outer/inner/own", new InternalNotFound()).TranslationCandidates);
         Assert.Equal(new[] { typeof(PublicError) }, Resolve(app, policy, "/outer/inner/inherited", new InternalNotFound()).TranslationCandidates);
@@ -70,7 +70,7 @@ public class VisibilityMinimalApiTests
             .WithErrorVisibility(scope => scope.For<OtherError>().UseGenericProblem());
         group.MapGet("/two", () => "ok");
         app.MapGet("/outside", () => "ok");
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Equal(new[] { typeof(NotFound) }, Resolve(app, policy, "/group/one", new InternalNotFound()).TranslationCandidates);
         Assert.Equal(new[] { typeof(NotFound) }, Resolve(app, policy, "/group/two", new InternalNotFound()).TranslationCandidates);
@@ -86,7 +86,7 @@ public class VisibilityMinimalApiTests
         app.MapGet("/hidden", () => "ok")
             .WithErrorVisibility(scope => scope.ForTree<PublicError>().UseGenericProblem());
         app.MapGet("/visible", () => "ok");
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Empty(Resolve(app, policy, "/hidden", new InternalNotFound()).TranslationCandidates);
         Assert.Equal(new[] { typeof(InternalNotFound) }, Resolve(app, policy, "/visible", new InternalNotFound()).TranslationCandidates);
@@ -107,7 +107,7 @@ public class VisibilityMinimalApiTests
             .WithMetadata(descriptor)
             .WithErrorVisibility(scope => scope.For<InternalNotFound>().TranslateEachType());
         app.MapGet("/controller", () => "ok").WithMetadata(descriptor);
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Equal(new[] { typeof(InternalNotFound) }, Resolve(app, policy, "/override", new InternalNotFound()).TranslationCandidates);
         Assert.Empty(Resolve(app, policy, "/controller", new InternalNotFound()).TranslationCandidates);
@@ -123,7 +123,7 @@ public class VisibilityMinimalApiTests
             .WithErrorVisibility(scope => scope.For<NotFound>().UseGenericProblem());
         outer.MapGet("/leaf", () => "ok")
             .WithErrorVisibility(scope => scope.For<InternalNotFound>().UseNearestAncestorMapping());
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Empty(Resolve(app, policy, "/outer/leaf", new InternalNotFound()).TranslationCandidates);
     }
@@ -134,14 +134,14 @@ public class VisibilityMinimalApiTests
         var builder = WebApplication.CreateSlimBuilder();
         builder.Services.AddFlowOnRailsVisibility(_ => { });
         await using var app = builder.Build();
-        VisibilityScope? retainedScope = null;
+        RuleScope? retainedScope = null;
         app.MapGet("/snapshot", () => "ok").WithErrorVisibility(scope =>
         {
             retainedScope = scope;
             scope.ForTree<PublicError>().TranslateEachType();
         });
         retainedScope!.For<InternalNotFound>().UseGenericProblem();
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Equal(new[] { typeof(InternalNotFound) }, Resolve(app, policy, "/snapshot", new InternalNotFound()).TranslationCandidates);
     }
@@ -186,7 +186,7 @@ public class VisibilityMinimalApiTests
             scope.For<NotFound>().TranslateEachType();
         }));
         endpoint.WithErrorVisibility(scope => scope.For<NotFound>().TranslateEachType());
-        var policy = app.Services.GetRequiredService<VisibilityPolicy>();
+        var policy = app.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.Equal(new[] { typeof(NotFound) }, Resolve(app, policy, "/leaf", new NotFound()).TranslationCandidates);
     }
@@ -204,18 +204,18 @@ public class VisibilityMinimalApiTests
             .WithErrorVisibility(scope => scope.ForTree<PublicError>().TranslateEachType());
         second.MapGet("/leaf", () => "ok")
             .WithErrorVisibility(scope => scope.ForTree<PublicError>().UseGenericProblem());
-        var firstPolicy = first.Services.GetRequiredService<VisibilityPolicy>();
-        var secondPolicy = second.Services.GetRequiredService<VisibilityPolicy>();
+        var firstPolicy = first.Services.GetRequiredService<ErrorPolicy>();
+        var secondPolicy = second.Services.GetRequiredService<ErrorPolicy>();
 
         Assert.NotSame(firstPolicy, secondPolicy);
         Assert.Equal(new[] { typeof(InternalNotFound) }, Resolve(first, firstPolicy, "/leaf", new InternalNotFound()).TranslationCandidates);
         Assert.Empty(Resolve(second, secondPolicy, "/leaf", new InternalNotFound()).TranslationCandidates);
     }
 
-    private static VisibilityResolution
+    private static ExposureDecision
         Resolve(
             WebApplication app,
-            VisibilityPolicy policy,
+            ErrorPolicy policy,
             string route,
             Error error
         )

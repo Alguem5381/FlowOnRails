@@ -14,7 +14,7 @@ public class VisibilityIndexTests
     [Fact]
     public void UnrelatedRules_DoNotChangeGlobalOrControllerResolution()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.For<PublicError>().TranslateEachType();
         builder.Global.ForDescendantsOf<PublicError>().UseNearestAncestorMapping();
         builder.ForController<UsersController>(scope => scope.ForTree<PublicError>().UseGenericProblem());
@@ -34,7 +34,7 @@ public class VisibilityIndexTests
     [InlineData(true)]
     public void FixedRangePriority_DoesNotDependOnRegistrationOrder(bool reverse)
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.For<PublicError>().TranslateEachType();
 
         void Broad() => builder.Global.ForTree<FamilyError>().UseNearestAncestorMapping();
@@ -63,7 +63,7 @@ public class VisibilityIndexTests
     [Fact]
     public async Task IndexedPolicy_IsSafeToShareAcrossConcurrentResolutions()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.ForTree<PublicError>().TranslateEachType();
         builder.ForController<UsersController>(scope => scope.For<LeafError>().UseGenericProblem());
         var policy = builder.Build();
@@ -78,7 +78,7 @@ public class VisibilityIndexTests
         await Task.WhenAll(tasks);
     }
 
-    private static void AddUnrelatedRules<T>(VisibilityScope scope)
+    private static void AddUnrelatedRules<T>(RuleScope scope)
     {
         scope.For<TaggedError<T, int>>().TranslateEachType();
         scope.For<TaggedError<T, long>>().UseGenericProblem();

@@ -13,7 +13,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void UnfinishedSelections_AreRejected()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.For<NotFound>();
         Assert.Throws<InvalidOperationException>(() => builder.Build());
     }
@@ -23,7 +23,7 @@ public class VisibilityConfigurationTests
     {
         foreach (var reverse in new[] { false, true })
         {
-            var builder = new VisibilityBuilder();
+            var builder = new PolicyBuilder();
             if (reverse) builder.Global.For<NotFound>().UseGenericProblem();
             builder.Global.For<NotFound>().TranslateEachType();
             if (!reverse) builder.Global.For<NotFound>().UseGenericProblem();
@@ -34,7 +34,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void ReconfiguringTheSameSelection_RejectsContradictoryBehaviors()
     {
-        var selection = new VisibilityBuilder().Global.For<NotFound>();
+        var selection = new PolicyBuilder().Global.For<NotFound>();
         selection.UseGenericProblem();
         Assert.Throws<InvalidOperationException>(() => selection.TranslateEachType());
     }
@@ -42,7 +42,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void IdenticalRegistrations_AreIdempotent()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.For<NotFound>().TranslateEachType();
         builder.Global.For<NotFound>().TranslateEachType();
         Assert.Equal(new[] { typeof(NotFound) }, builder.Build().Resolve(typeof(NotFound)).TranslationCandidates);
@@ -51,7 +51,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void ExplicitIncludes_CannotReopenAGenericTreeWithinTheSameScope()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.ForTree<PublicError>().UseGenericProblem();
         builder.Global.For<UserNotFound>().TranslateEachType();
         Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -60,7 +60,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void AncestorRules_CannotReopenAGenericDescendantRange()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.ForDescendantsOf<PublicError>().UseGenericProblem();
         builder.Global.ForTree<NotFound>().UseNearestAncestorMapping();
         Assert.Throws<InvalidOperationException>(() => builder.Build());
@@ -69,7 +69,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void DescendantExclusion_StillAllowsItsOwnRoot()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.For<NotFound>().TranslateEachType();
         builder.Global.ForDescendantsOf<NotFound>().UseGenericProblem();
         var policy = builder.Build();
@@ -80,7 +80,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void DescendantsOnlyGenericRule_CanNarrowAnInclusionAtTheSameRoot()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.ForTree<NotFound>(tree =>
         {
             tree.TranslateEachType();
@@ -94,7 +94,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void TreeBlocks_RejectUnrelatedSelectionsAndCannotEscapeTheirRange()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         Assert.Throws<ArgumentException>(() => builder.Global.ForTree<PublicError>(tree => tree.For<Unrelated>().TranslateEachType()));
         Assert.Throws<ArgumentException>(() => builder.Global.ForDescendantsOf<PublicError>(tree => tree.For<PublicError>().TranslateEachType()));
         Assert.Throws<ArgumentException>(() => builder.Global.ForDescendantsOf<PublicError>(tree => tree.ForTree<PublicError>().TranslateEachType()));
@@ -103,7 +103,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void OrganizationalBlocks_DoNotRequireARootBehavior()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         builder.Global.ForTree<PublicError>(tree => tree.For<NotFound>().TranslateEachType());
         Assert.Equal(new[] { typeof(NotFound) }, builder.Build().Resolve(typeof(NotFound)).TranslationCandidates);
     }
@@ -111,7 +111,7 @@ public class VisibilityConfigurationTests
     [Fact]
     public void InvalidTypesAndNullCallbacks_AreRejected()
     {
-        var builder = new VisibilityBuilder();
+        var builder = new PolicyBuilder();
         Assert.Throws<ArgumentNullException>(() => builder.Global.ForTree<PublicError>(null!));
         Assert.Throws<ArgumentNullException>(() => builder.Global.ForDescendantsOf<PublicError>(null!));
         Assert.Throws<ArgumentNullException>(() => builder.ForController<UsersController>(null!));

@@ -1,13 +1,13 @@
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>A bounded error family with optional behavior and narrower selections.</summary>
-public sealed class VisibilityTree : VisibilityScope
+public sealed class RuleTree : RuleScope
 {
-    private readonly List<VisibilityRule> _rules;
+    private readonly List<Rule> _rules;
     private readonly Type? _controllerType;
     private readonly ErrorSelection _selection;
 
-    internal VisibilityTree(List<VisibilityRule> rules, Type? controllerType, ErrorSelection selection)
+    internal RuleTree(List<Rule> rules, Type? controllerType, ErrorSelection selection)
         : base(rules, controllerType, selection)
     {
         _rules = rules;
@@ -25,18 +25,18 @@ public sealed class VisibilityTree : VisibilityScope
     public void UseNearestAncestorMapping() =>
         Behavior.UseNearestAncestorMapping();
 
-    private VisibilitySelection Behavior
+    private RuleSelection Behavior
     {
         get
         {
             if (field is not null)
                 return field;
 
-            var rule = new VisibilityRule(_selection, _controllerType);
+            var rule = new Rule(_selection, _controllerType);
 
             _rules.Add(rule);
 
-            return field = new VisibilitySelection(rule);
+            return field = new RuleSelection(rule);
         }
     }
 }

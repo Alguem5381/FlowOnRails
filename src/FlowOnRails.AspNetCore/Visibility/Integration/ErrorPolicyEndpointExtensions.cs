@@ -3,7 +3,7 @@ using FlowOnRails.AspNetCore.Visibility;
 namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>Configures visibility for an endpoint or route group.</summary>
-public static class VisibilityEndpointConventionBuilderExtensions
+public static class ErrorPolicyEndpointExtensions
 {
     extension<TBuilder>(TBuilder endpoints) where TBuilder : class, IEndpointConventionBuilder
     {
@@ -11,12 +11,12 @@ public static class VisibilityEndpointConventionBuilderExtensions
         /// Attach an immutable visibility scope. Endpoint rules precede inner groups, outer groups,
         /// controllers and global rules. Configure each endpoint or group once.
         /// </summary>
-        public TBuilder WithErrorVisibility(Action<VisibilityScope> configure)
+        public TBuilder WithErrorVisibility(Action<RuleScope> configure)
         {
             ArgumentNullException.ThrowIfNull(endpoints);
             ArgumentNullException.ThrowIfNull(configure);
 
-            var builder = new VisibilityBuilder();
+            var builder = new PolicyBuilder();
 
             configure(builder.Global);
 
@@ -24,12 +24,12 @@ public static class VisibilityEndpointConventionBuilderExtensions
 
             endpoints.Add(endpoint =>
             {
-                if (endpoint.Metadata.OfType<VisibilityMetadata>()
+                if (endpoint.Metadata.OfType<EndpointScopeMetadata>()
                     .Any(metadata => ReferenceEquals(metadata.Owner, endpoints)))
                     throw new InvalidOperationException(
                         "Visibility is already configured for this endpoint or route group. Combine its rules in one WithErrorVisibility call.");
 
-                endpoint.Metadata.Add(new VisibilityMetadata(endpoints, index));
+                endpoint.Metadata.Add(new EndpointScopeMetadata(endpoints, index));
             });
 
             return endpoints;

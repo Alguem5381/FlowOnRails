@@ -1,10 +1,10 @@
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Describes visibility independently of HTTP mappings or serialized properties.</summary>
-public sealed class VisibilityResolution
+public sealed class ExposureDecision
 {
     /// <summary>The effective behavior for the concrete error.</summary>
-    public VisibilityBehavior Behavior { get; }
+    public RuleBehavior Behavior { get; }
 
     /// <summary>
     /// Authorized projection contracts, nearest first. A translator must choose the first
@@ -13,7 +13,7 @@ public sealed class VisibilityResolution
     /// </summary>
     public IReadOnlyList<Type> TranslationCandidates { get; }
 
-    internal VisibilityResolution(VisibilityBehavior behavior, IEnumerable<Type> candidates)
+    internal ExposureDecision(RuleBehavior behavior, IEnumerable<Type> candidates)
     {
         Behavior = behavior;
         TranslationCandidates = Array.AsReadOnly([.. candidates]);

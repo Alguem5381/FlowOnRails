@@ -5,38 +5,38 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 namespace FlowOnRails.AspNetCore.Visibility;
 
 /// <summary>Resolves immutable visibility rules without reading error properties.</summary>
-public sealed class VisibilityPolicy
+public sealed class ErrorPolicy
 {
-    private readonly VisibilityIndex _global;
-    private readonly FrozenDictionary<Type, VisibilityIndex> _controllers;
+    private readonly RuleIndex _global;
+    private readonly FrozenDictionary<Type, RuleIndex> _controllers;
 
-    internal VisibilityPolicy(VisibilityRule[] rules)
+    internal ErrorPolicy(Rule[] rules)
     {
         _global = new(rules.Where(rule => rule.ControllerType is null));
         _controllers = rules
             .Where(rule => rule.ControllerType is not null)
             .GroupBy(rule => rule.ControllerType!)
-            .ToFrozenDictionary(group => group.Key, group => new VisibilityIndex(group));
+            .ToFrozenDictionary(group => group.Key, group => new RuleIndex(group));
     }
 
     /// <summary>
     /// Resolve a closed error type. Exact controller rules precede global rules; within a scope,
     /// the nearest error root wins, with exact, descendants-only, then tree rules breaking ties.
     /// </summary>
-    public VisibilityResolution
+    public ExposureDecision
         Resolve(
             Type errorType,
             Type? controllerType = null
         ) =>
         Resolve(errorType, controllerType, []);
 
-    internal VisibilityIndex GlobalIndex => _global;
+    internal RuleIndex GlobalIndex => _global;
 
-    private VisibilityResolution
+    private ExposureDecision
         Resolve(
             Type errorType,
             Type? controllerType,
-            IReadOnlyList<VisibilityMetadata> endpointScopes
+            IReadOnlyList<EndpointScopeMetadata> endpointScopes
         )
     {
         ArgumentNullException.ThrowIfNull(errorType);
@@ -48,13 +48,13 @@ public sealed class VisibilityPolicy
             ValidateController(controllerType);
 
         var effectiveRule = FindRule(errorType, controllerType, endpointScopes);
-        var behavior = effectiveRule?.Behavior ?? VisibilityBehavior.GenericProblem;
+        var behavior = effectiveRule?.Behavior ?? RuleBehavior.GenericProblem;
 
         switch (behavior)
         {
-            case VisibilityBehavior.GenericProblem:
+            case RuleBehavior.GenericProblem:
                 return new(behavior, []);
-            case VisibilityBehavior.TranslateEachType:
+            case RuleBehavior.TranslateEachType:
                 return new(behavior, [errorType]);
         }
 
@@ -68,24 +68,24 @@ public sealed class VisibilityPolicy
         {
             var rule = FindRule(ancestor, controllerType, endpointScopes);
             // An explicit generic response is a boundary; an unconfigured ancestor is not.
-            if (rule?.Behavior == VisibilityBehavior.GenericProblem)
+            if (rule?.Behavior == RuleBehavior.GenericProblem)
                 break;
 
             if (effectiveRule is not null && effectiveRule.Selection.IncludesType(ancestor))
                 continue;
 
-            if (rule?.Behavior == VisibilityBehavior.TranslateEachType)
+            if (rule?.Behavior == RuleBehavior.TranslateEachType)
                 candidates.Add(ancestor);
         }
 
-        return new VisibilityResolution(behavior, candidates);
+        return new ExposureDecision(behavior, candidates);
     }
 
     /// <summary>
     /// Resolve an error using the current endpoint's controller metadata.
     /// Endpoint and route-group rules precede controller and global rules. No controller instance is created.
     /// </summary>
-    public VisibilityResolution
+    public ExposureDecision
         ResolveForRequest(
             Error error,
             HttpContext httpContext
@@ -97,16 +97,16 @@ public sealed class VisibilityPolicy
         var endpoint = httpContext.GetEndpoint();
         var controllerType = endpoint?.Metadata
             .GetMetadata<ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
-        var endpointScopes = endpoint?.Metadata.GetOrderedMetadata<VisibilityMetadata>() ?? [];
+        var endpointScopes = endpoint?.Metadata.GetOrderedMetadata<EndpointScopeMetadata>() ?? [];
 
         return Resolve(error.GetType(), controllerType, endpointScopes);
     }
 
-    private VisibilityRule?
+    private Rule?
         FindRule(
             Type errorType,
             Type? controllerType,
-            IReadOnlyList<VisibilityMetadata> endpointScopes
+            IReadOnlyList<EndpointScopeMetadata> endpointScopes
         )
     {
         // Endpoint metadata is ordered outer group, inner groups, then endpoint.
