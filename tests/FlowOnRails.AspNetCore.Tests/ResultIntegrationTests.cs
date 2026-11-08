@@ -101,6 +101,8 @@ public class ResultIntegrationTests
         Assert.Equal("application/json", http.Content.Headers.ContentType!.MediaType);
         Assert.Equal(HttpStatusCode.NotFound, failure.StatusCode);
         Assert.Equal("application/problem+json", failure.Content.Headers.ContentType!.MediaType);
+        var problem = await failure.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(problem.GetProperty("customized").GetBoolean());
     }
 
     [Fact]

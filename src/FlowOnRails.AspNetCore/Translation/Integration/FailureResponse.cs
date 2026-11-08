@@ -24,7 +24,7 @@ internal static class FailureResponse
     internal static async Task WriteHttpAsync(Error error, HttpContext context)
     {
         var problem = Create(error, context);
-        context.Response.StatusCode = problem.Status!.Value;
+        context.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
         var writer = context.RequestServices.GetService<IProblemDetailsService>();
 
         if (writer is not null && await writer.TryWriteAsync(new()
@@ -37,7 +37,8 @@ internal static class FailureResponse
         if (context.Response.HasStarted)
             throw new InvalidOperationException("The problem writer started a response without completing it.");
 
-        context.Response.StatusCode = problem.Status!.Value;
+        Customize(problem, context);
+        context.Response.StatusCode = problem.Status ?? context.Response.StatusCode;
         await context.Response.WriteAsJsonAsync(problem,
             options: (JsonSerializerOptions?)null,
             contentType: "application/problem+json",
@@ -48,19 +49,26 @@ internal static class FailureResponse
     {
         var context = actionContext.HttpContext;
         var problem = Create(error, context);
+        var status = problem.Status ?? StatusCodes.Status500InternalServerError;
+
+        Customize(problem, context);
+        var result = new ObjectResult(problem)
+        {
+            StatusCode = problem.Status ?? status
+        };
+        result.ContentTypes.Add("application/problem+json");
+        result.ContentTypes.Add("application/problem+xml");
+
+        return result.ExecuteResultAsync(actionContext);
+    }
+
+    private static void Customize(ProblemDetails problem, HttpContext context)
+    {
         var options = context.RequestServices.GetService<IOptions<ProblemDetailsOptions>>();
         options?.Value.CustomizeProblemDetails?.Invoke(new()
         {
             HttpContext = context,
             ProblemDetails = problem
         });
-        var result = new ObjectResult(problem)
-        {
-            StatusCode = problem.Status
-        };
-        result.ContentTypes.Add("application/problem+json");
-        result.ContentTypes.Add("application/problem+xml");
-
-        return result.ExecuteResultAsync(actionContext);
     }
 }
