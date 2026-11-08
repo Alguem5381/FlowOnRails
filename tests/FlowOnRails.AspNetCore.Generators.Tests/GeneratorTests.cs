@@ -121,6 +121,53 @@ public class GeneratorTests
         Assert.Equal(2, result.GeneratorDiagnostics.Count(item => item.Id == "FORHTTP005"));
     }
 
+    [Theory]
+    [InlineData("dynamic", "object")]
+    [InlineData("string?", "string")]
+    [InlineData("nint", "System.IntPtr")]
+    [InlineData("(int Id, int Code)", "(int, int)")]
+    [InlineData("(int Id, int Code)", "System.ValueTuple<int, int>")]
+    [InlineData("System.Collections.Generic.List<dynamic[]>", "System.Collections.Generic.List<object[]>")]
+    [InlineData("(dynamic Value, string? Name)[]", "(object, string)[]")]
+    [InlineData("Outer<dynamic>.Inner<int>", "Outer<object>.Inner<int>")]
+    public void EquivalentClosedTypes_AreDiagnosedAsDuplicateMaps(string first, string second)
+    {
+        var source = Imports + $$"""
+            public record E<T> : Error;
+            public class Outer<T> { public class Inner<U>; }
+            public static partial class Problems {
+                [HttpProblem(400)] private static void First(ProblemBuilder<E<{{first}}>> p) { }
+                [HttpProblem(422)] private static void Second(ProblemBuilder<E<{{second}}>> p) { }
+            }
+            """;
+        var result = Generate(source);
+
+        var diagnostic = Assert.Single(result.GeneratorDiagnostics);
+        Assert.Equal("FORHTTP005", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.True(diagnostic.Location.IsInSource);
+        Assert.DoesNotContain(CreateCompilation(source).GetDiagnostics(), item => item.Severity == DiagnosticSeverity.Error);
+        Assert.Empty(result.Code);
+    }
+
+    [Theory]
+    [InlineData("int", "long")]
+    [InlineData("int", "int?")]
+    [InlineData("object[]", "object[,]")]
+    public void DistinctClosedTypes_AreNotDuplicateMaps(string first, string second)
+    {
+        var result = Generate(Imports + $$"""
+            public record E<T> : Error;
+            public static partial class Problems {
+                [HttpProblem(400)] private static void First(ProblemBuilder<E<{{first}}>> p) { }
+                [HttpProblem(422)] private static void Second(ProblemBuilder<E<{{second}}>> p) { }
+            }
+            """);
+
+        AssertNoErrors(result);
+        Assert.Equal(2, result.Code.Split('\n').Count(line => line.Contains("catalog.Add<", StringComparison.Ordinal)));
+    }
+
     [Fact]
     public void UnselectedDomainAssembly_IsAnActionableConfigurationError()
     {

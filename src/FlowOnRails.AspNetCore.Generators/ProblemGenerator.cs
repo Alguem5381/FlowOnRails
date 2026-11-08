@@ -142,7 +142,7 @@ public sealed class ProblemGenerator : IIncrementalGenerator
         }
 
         var maps = new List<Map>();
-        var targets = new HashSet<string>(StringComparer.Ordinal);
+        var targets = new List<INamedTypeSymbol>();
         var genericCount = 0;
 
         foreach (var method in methods)
@@ -220,8 +220,11 @@ public sealed class ProblemGenerator : IIncrementalGenerator
 
             var errorName = Name(error);
 
-            if (!targets.Add(errorName))
+            // Identity conversions ignore dynamic/object spelling and tuple element names.
+            if (targets.Any(target => compilation.ClassifyCommonConversion(error, target).IsIdentity))
                 diagnostics.Add(Diagnostic.Create(Duplicate, methodLocation, "More than one mapping targets '" + errorName + "'."));
+            else
+                targets.Add(error);
 
             var projection = automatic
                 ? Project(error, type, compilation, data, diagnostics, methodLocation, cancellation)

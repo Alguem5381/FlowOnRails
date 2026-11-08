@@ -187,6 +187,11 @@ responses cannot be replaced by a domain failure.
 | FORHTTP007 | Warning | Reserved automatic root property omitted |
 | FORHTTP008 | Error | Automatic property cannot be boxed into extensions |
 
+Duplicate detection uses C# identity conversions rather than type spelling. Maps
+for `SomeError<dynamic>` and `SomeError<object>` conflict, as do maps differing
+only in tuple element names or nullable reference annotations. Distinct value types
+such as `SomeError<int>` and `SomeError<int?>` remain separate contracts.
+
 Configuration-body conflicts, such as manually configuring extensions on a map
 marked automatic, are rejected during catalog registration. Arbitrary C# callback
 bodies are not executed or fully interpreted by the generator.
