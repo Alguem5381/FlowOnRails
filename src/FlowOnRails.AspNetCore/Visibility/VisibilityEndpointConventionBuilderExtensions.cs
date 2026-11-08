@@ -5,17 +5,13 @@ namespace Microsoft.AspNetCore.Builder;
 /// <summary>Configures visibility for an endpoint or route group.</summary>
 public static class VisibilityEndpointConventionBuilderExtensions
 {
-    extension<TBuilder>(TBuilder endpoints)
-        where TBuilder : class, IEndpointConventionBuilder
+    extension<TBuilder>(TBuilder endpoints) where TBuilder : class, IEndpointConventionBuilder
     {
         /// <summary>
         /// Attach an immutable visibility scope. Endpoint rules precede inner groups, outer groups,
         /// controllers and global rules. Configure each endpoint or group once.
         /// </summary>
-        public TBuilder
-            WithErrorVisibility(
-                Action<VisibilityScope> configure
-            )
+        public TBuilder WithErrorVisibility(Action<VisibilityScope> configure)
         {
             ArgumentNullException.ThrowIfNull(endpoints);
             ArgumentNullException.ThrowIfNull(configure);

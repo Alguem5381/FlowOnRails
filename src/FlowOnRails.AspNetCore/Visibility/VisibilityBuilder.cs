@@ -18,10 +18,7 @@ public sealed class VisibilityBuilder
     public VisibilityScope Global { get; }
 
     /// <summary>Configure overrides for this exact controller type; its subclasses do not inherit them.</summary>
-    public void
-        ForController<TController>(
-            Action<VisibilityScope> configure
-        )
+    public void ForController<TController>(Action<VisibilityScope> configure)
         where TController : class
     {
         ArgumentNullException.ThrowIfNull(configure);
@@ -58,7 +55,8 @@ public sealed class VisibilityBuilder
         {
             if (other.Selection.ReopensExcludedRange(blocked.Selection))
                 throw new InvalidOperationException(
-                    $"Rule for '{other.Selection.Root}' contradicts the generic-response exclusion of '{blocked.Selection.Root}'.");
+                    $"Rule for '{other.Selection.Root}' contradicts the generic-response " +
+                    $"exclusion of '{blocked.Selection.Root}'.");
         }
 
         return new VisibilityPolicy([.. rules.DistinctBy(rule => (rule.ControllerType, rule.Selection))]);
