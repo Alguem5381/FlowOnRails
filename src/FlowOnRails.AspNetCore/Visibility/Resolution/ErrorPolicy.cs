@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Controllers;
 
@@ -7,12 +8,12 @@ namespace FlowOnRails.AspNetCore.Visibility;
 /// <summary>Resolves immutable visibility rules without reading error properties.</summary>
 public sealed class ErrorPolicy
 {
-    private readonly RuleIndex _global;
     private readonly FrozenDictionary<Type, RuleIndex> _controllers;
 
     internal ErrorPolicy(Rule[] rules)
     {
-        _global = new(rules.Where(rule => rule.ControllerType is null));
+        GlobalIndex = new(rules.Where(rule => rule.ControllerType is null));
+
         _controllers = rules
             .Where(rule => rule.ControllerType is not null)
             .GroupBy(rule => rule.ControllerType!)
@@ -23,26 +24,22 @@ public sealed class ErrorPolicy
     /// Resolve a closed error type. Exact controller rules precede global rules; within a scope,
     /// the nearest error root wins, with exact, descendants-only, then tree rules breaking ties.
     /// </summary>
-    public ExposureDecision
-        Resolve(
-            Type errorType,
-            Type? controllerType = null
-        ) =>
+    public ExposureDecision Resolve(Type errorType, Type? controllerType = null) =>
         Resolve(errorType, controllerType, []);
 
-    internal RuleIndex GlobalIndex => _global;
+    internal RuleIndex GlobalIndex { get; }
 
-    private ExposureDecision
-        Resolve(
-            Type errorType,
-            Type? controllerType,
-            IReadOnlyList<EndpointScopeMetadata> endpointScopes
-        )
+    private ExposureDecision Resolve(
+        Type errorType,
+        Type? controllerType,
+        IReadOnlyList<EndpointScopeMetadata> endpointScopes
+    )
     {
         ArgumentNullException.ThrowIfNull(errorType);
 
         if (!typeof(Error).IsAssignableFrom(errorType) || errorType.ContainsGenericParameters)
-            throw new ArgumentException("A closed type derived from Error is required.", nameof(errorType));
+            throw new ArgumentException("A closed type derived from Error is required.",
+                nameof(errorType));
 
         if (controllerType is not null)
             ValidateController(controllerType);
@@ -85,36 +82,32 @@ public sealed class ErrorPolicy
     /// Resolve an error using the current endpoint's controller metadata.
     /// Endpoint and route-group rules precede controller and global rules. No controller instance is created.
     /// </summary>
-    public ExposureDecision
-        ResolveForRequest(
-            Error error,
-            HttpContext httpContext
-        )
+    public ExposureDecision ResolveForRequest(Error error, HttpContext httpContext)
     {
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(httpContext);
 
         var endpoint = httpContext.GetEndpoint();
-        var controllerType = endpoint?.Metadata
-            .GetMetadata<ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
+
+        var controllerType = endpoint?
+            .Metadata
+            .GetMetadata<ControllerActionDescriptor>()?
+            .ControllerTypeInfo
+            .AsType();
+
         var endpointScopes = endpoint?.Metadata.GetOrderedMetadata<EndpointScopeMetadata>() ?? [];
 
         return Resolve(error.GetType(), controllerType, endpointScopes);
     }
 
-    private Rule?
-        FindRule(
-            Type errorType,
-            Type? controllerType,
-            IReadOnlyList<EndpointScopeMetadata> endpointScopes
-        )
+    private Rule? FindRule(
+        Type errorType,
+        Type? controllerType,
+        IReadOnlyList<EndpointScopeMetadata> endpointScopes
+    )
     {
         // Endpoint metadata is ordered outer group, inner groups, then endpoint.
-        for (
-            var index = endpointScopes.Count - 1;
-            index >= 0;
-            index--
-        )
+        for (var index = endpointScopes.Count - 1; index >= 0; index--)
         {
             var match = endpointScopes[index].Index.FindRule(errorType);
 
@@ -122,16 +115,13 @@ public sealed class ErrorPolicy
                 return match;
         }
 
-        if (controllerType is not null &&
-            _controllers.TryGetValue(controllerType, out var controller))
-        {
-            var local = controller.FindRule(errorType);
+        if (controllerType is null ||
+            !_controllers.TryGetValue(controllerType, out var controller))
+            return GlobalIndex.FindRule(errorType);
 
-            if (local is not null)
-                return local;
-        }
+        var local = controller.FindRule(errorType);
 
-        return _global.FindRule(errorType);
+        return local ?? GlobalIndex.FindRule(errorType);
     }
 
     internal static void ValidateController(Type controllerType)

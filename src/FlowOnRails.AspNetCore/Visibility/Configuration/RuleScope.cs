@@ -15,32 +15,27 @@ public class RuleScope
     }
 
     /// <summary>Select only this error type.</summary>
-    public RuleSelection For<TError>() where TError : Error =>
+    public RuleSelection For<TError>()
+        where TError : Error =>
         Select(typeof(TError), ErrorRange.Exact);
 
     /// <summary>Select this error type and all its descendants.</summary>
-    public RuleSelection ForTree<TError>() where TError : Error =>
+    public RuleSelection ForTree<TError>()
+        where TError : Error =>
         Select(typeof(TError), ErrorRange.Tree);
 
     /// <summary>Select descendants without selecting their root.</summary>
-    public RuleSelection
-        ForDescendantsOf<TError>()
+    public RuleSelection ForDescendantsOf<TError>()
         where TError : Error =>
         Select(typeof(TError), ErrorRange.Descendants);
 
     /// <summary>Configure a block bounded by this error type and its descendants.</summary>
-    public void
-        ForTree<TError>(
-            Action<RuleTree> configure
-        )
+    public void ForTree<TError>(Action<RuleTree> configure)
         where TError : Error =>
         ConfigureTree(typeof(TError), ErrorRange.Tree, configure);
 
     /// <summary>Configure a block bounded by the descendants, excluding the root.</summary>
-    public void
-        ForDescendantsOf<TError>(
-            Action<RuleTree> configure
-        )
+    public void ForDescendantsOf<TError>(Action<RuleTree> configure)
         where TError : Error =>
         ConfigureTree(typeof(TError), ErrorRange.Descendants, configure);
 
@@ -55,12 +50,7 @@ public class RuleScope
         return new RuleSelection(rule);
     }
 
-    private void
-        ConfigureTree(
-            Type root,
-            ErrorRange range,
-            Action<RuleTree> configure
-        )
+    private void ConfigureTree(Type root, ErrorRange range, Action<RuleTree> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
 
