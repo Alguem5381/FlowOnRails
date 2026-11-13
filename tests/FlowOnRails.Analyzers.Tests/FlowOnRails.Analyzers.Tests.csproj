@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(FlowOnRailsTestTargetFramework)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <Using Include="Xunit" />
+    <ProjectReference Include="../../src/FlowOnRails/FlowOnRails.csproj" />
+    <ProjectReference Include="../../src/FlowOnRails.CodeFixes/FlowOnRails.CodeFixes.csproj" />
+    <ProjectReference Include="../../src/FlowOnRails.Analyzers/FlowOnRails.Analyzers.csproj" />
+    <None Include="../../samples/FlowOnRails.Analysis.Sample/Study.cs" Link="Study.cs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

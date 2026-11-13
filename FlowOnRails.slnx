@@ -27,16 +27,21 @@
   </Folder>
 
   <Folder Name="/src/">
+    <Project Path="src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj" />
+    <Project Path="src/FlowOnRails.CodeFixes/FlowOnRails.CodeFixes.csproj" />
+    <Project Path="src/FlowOnRails.Analyzers/FlowOnRails.Analyzers.csproj" />
     <Project Path="src/FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj" />
     <Project Path="src/FlowOnRails/FlowOnRails.csproj" />
     <Project Path="src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj" />
   </Folder>
 
   <Folder Name="/samples/">
+    <Project Path="samples/FlowOnRails.Analysis.Sample/FlowOnRails.Analysis.Sample.csproj" />
     <Project Path="samples/FlowOnRails.AspNetCore.Sample/FlowOnRails.AspNetCore.Sample.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
+    <Project Path="tests/FlowOnRails.Analyzers.Tests/FlowOnRails.Analyzers.Tests.csproj" />
     <Project Path="tests/FlowOnRails.AspNetCore.Generators.Tests/FlowOnRails.AspNetCore.Generators.Tests.csproj" />
     <Project Path="tests/FlowOnRails.TestDomain/FlowOnRails.TestDomain.csproj" />
     <Project Path="tests/FlowOnRails.Tests/FlowOnRails.Tests.csproj" />
