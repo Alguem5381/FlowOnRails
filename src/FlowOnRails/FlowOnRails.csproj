@@ -6,8 +6,9 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeFlowTools</TargetsForTfmSpecificContentInPackage>
     <PackageId>FlowOnRails</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>alguem5381</Authors>
     <Description>A modern, lightweight, and compiler-safe library for Railway Oriented Programming in C#.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -19,10 +20,25 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    <None Update="buildTransitive/FlowOnRails.props" Pack="true" PackagePath="buildTransitive/FlowOnRails.props" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../FlowOnRails.Analysis/FlowOnRails.Analysis.csproj;../FlowOnRails.Analyzers/FlowOnRails.Analyzers.csproj;../FlowOnRails.CodeFixes/FlowOnRails.CodeFixes.csproj"
+                      ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="FlowOnRails.Tests" />
   </ItemGroup>
 
+  <Target Name="IncludeFlowTools">
+    <MSBuild Projects="../FlowOnRails.Analysis/FlowOnRails.Analysis.csproj;../FlowOnRails.Analyzers/FlowOnRails.Analyzers.csproj;../FlowOnRails.CodeFixes/FlowOnRails.CodeFixes.csproj"
+             Targets="GetTargetPath" Properties="Configuration=$(Configuration)" RemoveProperties="TargetFramework">
+      <Output TaskParameter="TargetOutputs" ItemName="_FlowToolAssembly" />
+    </MSBuild>
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(_FlowToolAssembly)" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
 </Project>

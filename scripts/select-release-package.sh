@@ -7,6 +7,11 @@ if [[ $# -ne 1 ]]; then
 fi
 
 case "$1" in
+  analysis/v*)
+    project="src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj"
+    package_id="FlowOnRails.Analysis"
+    tag_version="${1#analysis/v}"
+    ;;
   aspnetcore/v*)
     project="src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj"
     package_id="FlowOnRails.AspNetCore"
@@ -18,7 +23,7 @@ case "$1" in
     tag_version="${1#v}"
     ;;
   *)
-    echo "Unsupported release tag '$1'. Use v<version> or aspnetcore/v<version>." >&2
+    echo "Unsupported release tag '$1'. Use v<version>, aspnetcore/v<version> or analysis/v<version>." >&2
     exit 1
     ;;
 esac
