@@ -18,6 +18,29 @@ FlowOnRails is a library built to bring Railway Oriented Programming to C# nativ
 dotnet add package FlowOnRails
 ```
 
+## Error-flow tooling (preview)
+
+The runtime package targets .NET 10 and can also be consumed by .NET 11 projects.
+CI validates both runtimes, including C# 15 consumers and .NET 11 runtime async.
+See [compatibility and build selection](docs/compatibility.md) for the tested
+interactions and compiler-host requirements.
+
+FlowOnRails 0.3.0 includes informational error-flow hints, assembly summary
+generation and editor actions. Analysis is off by default. To enable it in a
+project that references FlowOnRails, add this to its project file:
+
+```xml
+<PropertyGroup>
+  <FlowOnRailsEnableFlowAnalysis>true</FlowOnRailsEnableFlowAnalysis>
+</PropertyGroup>
+```
+
+`FlowOnRails.Analysis` is the separate Roslyn API for authors of satellite tools.
+
+Start with [the usage guide](docs/error-flow.md). Satellite authors should read
+[the integration contract](docs/design/analysis-integration.md). Unknown contracts
+remain open and no compiler exhaustiveness warning is suppressed.
+
 ## Usage
 
 ### Defining Errors

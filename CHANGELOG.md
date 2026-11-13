@@ -22,6 +22,13 @@
 
 - Internal error access is described by `MemberNotNullWhen` on state properties, removing null-forgiving operators after state checks while retaining runtime validation.
 
+## [0.3.0] - 2026-11-13
+
+- Includes opt-in error-flow analysis in the base package. Set
+  `FlowOnRailsEnableFlowAnalysis=true` to enable diagnostics and summary export.
+- Adds `ResultsWith` contracts and cross-assembly error-flow summaries.
+- Validates package consumers on .NET 10 and .NET 11, including C# 15 scenarios.
+
 ## [0.2.0] - 2026-11-02
 
 ### Added
