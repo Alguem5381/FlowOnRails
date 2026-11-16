@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageConsumerFramework Condition="'$(PackageConsumerFramework)' == ''">net10.0</PackageConsumerFramework>
+    <TargetFramework>$(PackageConsumerFramework)</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../CSharp15.cs" Condition="'$(TargetFramework)' == 'net11.0'" />
+    <PackageReference Include="FlowOnRails" Version="$(FlowOnRailsVersion)" />
+  </ItemGroup>
+</Project>

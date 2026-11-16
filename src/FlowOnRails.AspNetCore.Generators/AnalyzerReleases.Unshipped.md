@@ -12,3 +12,5 @@ FORHTTP005 | Configuration | Error | Duplicate mapping
 FORHTTP006 | Configuration | Error | Error assembly not selected
 FORHTTP007 | Projection | Warning | Reserved extension name omitted
 FORHTTP008 | Projection | Error | Unsupported automatic property
+FORHTTP009 | Mapping | Warning | Visible endpoint error has no authorized translation
+FORHTTP010 | Mapping | Info | Endpoint translation analysis is unavailable

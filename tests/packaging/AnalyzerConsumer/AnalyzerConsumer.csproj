@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageConsumerFramework Condition="'$(PackageConsumerFramework)' == ''">net10.0</PackageConsumerFramework>
+    <TargetFramework>$(PackageConsumerFramework)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ErrorLog>$(MSBuildProjectDirectory)/obj/flow.sarif,version=2.1</ErrorLog>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <PackageReference Include="FlowOnRails" Version="$(FlowOnRailsVersion)" />
+    <ProjectReference Include="Producer/Producer.csproj" />
+  </ItemGroup>
+</Project>

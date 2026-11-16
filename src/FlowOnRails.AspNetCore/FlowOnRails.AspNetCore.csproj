@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>FlowOnRails.AspNetCore</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>alguem5381</Authors>
     <Description>ASP.NET Core integration for FlowOnRails with scoped error visibility, generated ProblemDetails mappings and native HTTP/MVC result adapters.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -24,7 +24,7 @@
     <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <Target Name="IncludeProblemGenerator">
-    <MSBuild Projects="../FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj"
+    <MSBuild Projects="../FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj;../FlowOnRails.Analysis/FlowOnRails.Analysis.csproj"
              Targets="GetTargetPath" Properties="Configuration=$(Configuration)" RemoveProperties="TargetFramework">
       <Output TaskParameter="TargetOutputs" ItemName="_ProblemGenerator" />
     </MSBuild>

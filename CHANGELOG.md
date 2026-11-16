@@ -22,6 +22,25 @@
 
 - Internal error access is described by `MemberNotNullWhen` on state properties, removing null-forgiving operators after state checks while retaining runtime validation.
 
+## [FlowOnRails 0.4.0 / FlowOnRails.Analysis 0.4.0 / FlowOnRails.AspNetCore 0.2.0] - 2026-11-16
+
+### Added
+
+- Query error flow at several expressions within one executable body, including local and anonymous functions, using the public Analysis API.
+- Check HTTP mapping coverage at conversion inputs after local assignments, recovery and supported argument forwarding, with independent endpoint visibility.
+- Bundle the Analysis API with the ASP.NET analyzer and verify local and cross-assembly handlers through isolated package consumers.
+
+### Fixed
+
+- Stop evaluating receivers, arguments and callbacks after a path loses normal continuation.
+
+## [0.3.0] - 2026-11-13
+
+- Includes opt-in error-flow analysis in the base package. Set
+  `FlowOnRailsEnableFlowAnalysis=true` to enable diagnostics and summary export.
+- Adds `ResultsWith` contracts and cross-assembly error-flow summaries.
+- Validates package consumers on .NET 10 and .NET 11, including C# 15 scenarios.
+
 ## [0.2.0] - 2026-11-02
 
 ### Added

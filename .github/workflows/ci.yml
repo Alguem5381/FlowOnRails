@@ -19,7 +19,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            10.0.1xx
+            11.0.1xx
 
       - name: Restore dependencies
         run: dotnet restore FlowOnRails.slnx
@@ -39,5 +41,15 @@ jobs:
       - name: Pack ASP.NET Core integration
         run: dotnet pack src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj --configuration Release --no-build --no-restore --output ./artifacts/packages
 
-      - name: Verify isolated package consumers
-        run: python3 scripts/verify-packages.py ./artifacts/packages
+      - name: Pack analysis API
+        run: dotnet pack src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj --configuration Release --no-build --no-restore --output ./artifacts/packages
+
+      - name: Test on .NET 11
+        working-directory: tests/compatibility
+        run: dotnet test ../../FlowOnRails.slnx --configuration Release -p:FlowOnRailsTestTargetFramework=net11.0 --verbosity normal
+
+      - name: Verify isolated .NET 10 and .NET 11 package consumers
+        run: python3 scripts/verify-packages.py ./artifacts/packages --framework net10.0 --framework net11.0
+
+      - name: Verify .NET 11 runtime async consumers
+        run: python3 scripts/verify-packages.py ./artifacts/packages --framework net11.0 --runtime-async

@@ -1,11 +1,13 @@
 # ASP.NET Core error visibility
 
-Status: implemented foundation, not yet a published package (updated 2026-11-07).
+Status: implemented visibility foundation.
 
 `FlowOnRails.AspNetCore` is separate from the base library. It selects which error
-contracts may be considered for HTTP translation. Status mappings, property
-projection, ProblemDetails writing, success response helpers, source generators,
-compile-time analyzers and OpenAPI support are not implemented yet.
+contracts may be considered for HTTP translation. HTTP mappings, property
+projection, ProblemDetails writing, result adapters, generation and endpoint
+mapping analysis build on this foundation. See the
+[current runtime guide](../../src/FlowOnRails.AspNetCore/README.md) for their usage
+and limitations. OpenAPI support remains outside this implementation.
 
 ## Configure global and controller scopes
 
@@ -105,10 +107,10 @@ whole tree from ancestor candidates.
 
 Visibility returns a `ExposureDecision`, containing `Behavior` and an
 immutable `TranslationCandidates` list. It does not check whether mappings exist.
-The future translator must use the first candidate with a mapping, projecting
+The translator uses the first candidate with a mapping, projecting
 that candidate's contract, never additional concrete-descendant properties.
 If no candidate or mapping exists, the translator must use the generic response.
-The planned default is a generic 500 ProblemDetails, but visibility itself writes
+The translator's default is a generic 500 ProblemDetails, but visibility itself writes
 no HTTP response. Nothing infers status codes from names such as `NotFoundError`.
 
 Property selection is a separate mapping concern. Allowing a contract does not
@@ -213,13 +215,14 @@ applications have independent policies. Builder and scope changes after snapshot
 creation do not change an existing policy. The resolver reads types only, not
 properties or `ToString`. The base FlowOnRails assembly has no ASP.NET dependency.
 
-## Next: HTTP mapping and analyzer
+## HTTP mapping and analyzer
 
-The visibility core cannot diagnose a missing HTTP mapping before a translation
-catalog exists. A future analyzer should distinguish an authorized own contract
-with no mapping, an ancestor rule with no mapped authorized ancestor, and an
-intentional generic response (which requires no specific mapping). It must take
-all local scopes into account and use configured mappings rather than type names.
+Visibility resolution supplies authorized contracts independently of the translation
+catalog. The [endpoint mapping analyzer](aspnetcore-mapping-analysis.md) combines
+known error cases with statically resolved scopes and registered mappings. It
+distinguishes an authorized own contract with no mapping, an ancestor rule with
+no mapped authorized ancestor, and an intentional generic response. Unsupported
+configuration is reported as incomplete verification, rather than missing maps.
 
 References:
 

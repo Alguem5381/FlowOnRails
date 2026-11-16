@@ -1,0 +1,147 @@
+# Integração da análise nos projetos satélites
+
+`FlowOnRails.AspNetCore` consome esta API para verificar mapas de erros conhecidos
+por endpoint. O recorte e as limitações estão em
+[verificação de mapeamentos HTTP](aspnetcore-mapping-analysis.md).
+A auditoria e o acompanhamento das correções do motor estão em `docs/reviews`;
+não tratar os resultados como prova de exaustividade.
+
+## Fronteiras dos componentes
+
+| Componente | Responsabilidade | Dependência de execução da aplicação |
+| --- | --- | --- |
+| FlowOnRails | Rail, RailFor, Error, atributos e ferramentas de análise opcionais | Sim |
+| FlowOnRails.Analysis | API Roslyn, motor e leitor dos resumos | Não; ferramenta de compilação |
+| FlowOnRails.AspNetCore | Tradução HTTP, gerador e analisador de mapeamentos | Sim para o adaptador; ferramentas rodam na compilação |
+
+O pacote base inclui as DLLs de `FlowOnRails.Analyzers` e `FlowOnRails.CodeFixes`
+como ferramentas de compilação, desativadas por padrão. O motor
+mora em `src/FlowOnRails.Analysis/Internal`. Essas classes são internas, mesmo
+quando um projeto amigo consegue acessá-las. O contrato público é a fachada
+`ErrorFlowAnalysis`, `ErrorFlowSummary` e `ErrorFlowCase`, junto aos modelos
+`ErrorFlowLimitation`, `ErrorFlowLimitationCode` e `ErrorFlowSummaryOrigin`.
+Consultas por ponto usam `AnalyzeExpressions`, `ErrorFlowExpressionResult` e
+`ErrorFlowExpressionStatus`.
+
+## Como um gerador consulta os erros
+
+```csharp
+if (!ErrorFlowAnalysis.TryCreate(compilation, out var analysis))
+    return;
+
+if (!analysis.TryAnalyzeMethod(handlerMethod, out var summary, cancellationToken))
+    return;
+
+foreach (var errorType in summary.KnownErrorTypes)
+    CollectVisibleMapping(errorType);
+
+if (summary.HasUnknownErrors)
+    KeepGenericErrorMapping();
+```
+
+O exemplo é conceitual: `handlerMethod` precisa ser um `IMethodSymbol` cujo retorno
+seja Rail/RailFor/Error, opcionalmente Task/ValueTask. Ele também pode representar
+uma função local ou lambda consultada independentemente, com entradas e capturas
+desconhecidas. A API não recebe valores hipotéticos de argumentos do consumidor.
+Uma função que envolve o handler deve ser identificada pelo gerador HTTP; o motor
+não infere as regras de endpoints do ASP.NET.
+
+Para um handler que retorna `IResult`, identificar as expressões Rail/Error que
+chegam à tradução HTTP e passá-las a `AnalyzeExpressions(bodySymbol, expressions,
+cancellationToken)`. O retorno do corpo pode ser arbitrário. A análise interpreta
+o corpo uma vez para coletar os pontos solicitados, preservando a especialização
+de chamadas concretas encontrada no código. Lambdas e funções locais têm corpos
+próprios; não misturar expressões delas com pontos do método que as declara.
+
+Cada ponto tem status Analyzed, Unreachable ou Unsupported. Apenas Analyzed tem
+Summary; os demais não certificam ausência de erros. Os erros são específicos do
+ponto, mas condições e limitações descrevem conservadoramente o corpo inteiro.
+Um ponto não suportado não desliga os demais. Consulte o
+[contrato das expressões](../../src/FlowOnRails.Analysis/README.md#query-expressions-within-a-body)
+para as validações de entrada e a distinção entre erro desconhecido e consulta
+indisponível.
+
+Criar o contexto por compilação, reaproveitá-lo durante aquela execução e passá-lo
+para as consultas; consultas concorrentes são suportadas. `CanAnalyze` verifica
+o tipo de retorno e a origem do símbolo sem executar a análise. Os métodos Try
+retornam false quando o contexto/método não é suportado; consultas abertas ainda
+retornam true com um resumo. Cancelamento continua lançando OperationCanceledException.
+Não guardar símbolos ou resumos num singleton entre compilações.
+A API não depende de Workspaces e pode ser usada num gerador incremental. Ela não
+exige `FlowOnRailsEnableFlowAnalysis` para a consulta explícita; a propriedade
+controla a execução automática dos diagnósticos e da exportação.
+
+## Fonte, referência e ordem dos geradores
+
+Para código da compilação atual, a API interpreta o corpo disponível. Para outro
+assembly, lê `FlowAnalysisSummaryAttribute`. Para interfaces e despacho virtual
+não fechado, combina `ResultsWith` com uma parcela aberta. Métodos indisponíveis,
+metadados ausentes/incompatíveis e tipos inacessíveis não viram resultados vazios.
+
+Os geradores veem a compilação de entrada, sem a saída de outros geradores na
+mesma rodada. Portanto, o gerador HTTP não deve esperar que o manifesto do gerador
+FlowOnRails já esteja disponível para métodos locais. Deve consultar a API. Os
+manifestos de assemblies já compilados podem ser usados normalmente. Esta é uma
+restrição do [modelo de source generators do Roslyn](https://github.com/dotnet/roslyn/blob/main/docs/features/source-generators.md).
+
+Também não se deve interpretar o texto de FORFLOW001/FORFLOW002, coletar strings
+de nomes de namespaces, nem implementar uma segunda versão do codec binário.
+Os diagnósticos são apresentação; a API retorna símbolos e estados estruturados.
+
+## Interpretação do resultado
+
+- `ErrorCases` representa tipos exatos ou famílias abertas com exclusões.
+- `KnownErrorTypes` omite o marcador Error base, mas ainda pode conter o limite de
+  uma família. Não significa que seus descendentes foram enumerados.
+- `HasUnknownErrors` exige preservar a alternativa desconhecida.
+- `HasUnresolvedConditions` indica que o conjunto pode incluir caminhos inviáveis;
+  isso não implica, por si só, tipos desconhecidos.
+- `MayBeInvalid` distingue Rail não inicializado de um erro de domínio.
+- `MaySucceed` e `MayProduceResult` descrevem o resultado após desembrulhar async.
+- `LimitationDetails` fornece `Code` estável e `Message` para apresentação.
+  Compare `ErrorFlowLimitationCode`, por exemplo MetadataMissing ou OpenDispatch.
+- `Limitations` preserva a lista de mensagens para apresentação e compatibilidade.
+- `Origin` descreve a consulta principal: SourceBody, AssemblyMetadata ou OpenContract.
+  Um corpo local pode incorporar resumos externos e continuar sendo SourceBody.
+
+Mesmo um resultado fechado no modelo suportado não deve remover a resposta HTTP
+genérica nem suprimir avisos do compilador. A análise é aproximada e tem limites.
+Tipos encontrados pelo motor também não estabelecem automaticamente sua
+visibilidade HTTP, o status, a exposição da mensagem ou a autorização de uma camada.
+Essas decisões continuam pertencendo ao contrato e à política do satélite.
+
+## Empacotamento das ferramentas HTTP
+
+No projeto do gerador, referenciar `FlowOnRails.Analysis` com `PrivateAssets="all"`.
+No NuGet do satélite, colocar a DLL da análise junto à DLL do gerador em
+`analyzers/dotnet/cs`. Não tornar `Microsoft.CodeAnalysis.*` ou a API de análise
+uma dependência de execução da aplicação. Usar a mesma versão da API embutida
+pelas ferramentas FlowOnRails para evitar duas versões no carregador de analyzers.
+
+O satélite não precisa distribuir as correções de editor do pacote de análise.
+Os projetos produtores precisam ativar `FlowOnRailsEnableFlowAnalysis` para exportar seus
+resumos. Instalar o analisador só no consumidor não reconstitui corpos dos DLLs.
+
+## Metadados e evolução
+
+O atributo público tem versão, identificador documental do método original e
+payload opaco. O gerador exporta versão 3; o leitor aceita versões 1, 2 e 3.
+A versão 2 inclui alternativas condicionadas e saídas ref/out; a versão 3 acrescenta
+os códigos das limitações. A fachada retorna o resumo agregado para entradas que
+não são conhecidas. Limitações armazenadas só como texto nos formatos antigos
+recebem Unclassified; códigos futuros desconhecidos também preservam sua mensagem
+como Unclassified. Nenhum código é deduzido pela redação da mensagem.
+A origem da consulta é resolvida no consumidor e não copiada do produtor.
+A versão do payload é independente da versão NuGet.
+Não persistir ou analisar esse formato fora da biblioteca de análise.
+
+## Pontos de integração ASP.NET
+
+1. Identificar o corpo do endpoint e as expressões Rail fornecidas às conversões HTTP.
+2. Consultar `AnalyzeExpressions` por corpo e combinar cada resultado com a visibilidade e os mapeamentos da rota.
+3. Manter tratamento genérico para erros desconhecidos e não inicialização.
+4. Testar implementações concretas, interfaces, Task/ValueTask e assemblies separados.
+5. Empacotar a dependência do gerador e testar um consumidor instalado por NuGet.
+
+A auditoria independente e as correções estão documentadas em `docs/reviews`.
+Esta etapa preserva a análise aproximada e o fallback de erros desconhecidos.

@@ -1,0 +1,36 @@
+(19,25): warning AUDIT001: Action 'Unmapped' may return 'Denied', which has no mapping on controller 'ExampleController'
+(22,31): info AUDIT002: Action 'Open' may return other errors; keep a general error fallback
+(23,31): warning AUDIT001: Action 'LocalTask' may return 'Denied', which has no mapping on controller 'ExampleController'
+(24,42): warning AUDIT001: Action 'LocalValueTask' may return 'Denied', which has no mapping on controller 'ExampleController'
+(25,25): warning AUDIT001: Action 'Remote' may return 'Producer.RemoteMissing', which has no mapping on controller 'ExampleController'
+(26,31): warning AUDIT001: Action 'RemoteTask' may return 'Producer.RemoteMissing', which has no mapping on controller 'ExampleController'
+(27,36): warning AUDIT001: Action 'RemoteValueTask' may return 'Producer.RemoteMissing', which has no mapping on controller 'ExampleController'
+PASS: concurrent DiagnosticAnalyzer host, six missing mappings, one open contract, mapped/recovered/success-Error cases clean.
+SUMMARY LocalTask: known=[Denied], open=False, success=False, result=True
+SUMMARY LocalValueTask: known=[Denied], open=False, success=False, result=True
+SUMMARY Remote: known=[RemoteMissing], open=False, success=False, result=True
+SUMMARY RemoteTask: known=[RemoteMissing], open=False, success=False, result=True
+SUMMARY RemoteValueTask: known=[RemoteMissing], open=False, success=False, result=True
+SUMMARY Unmapped: known=[Denied], open=False, success=False, result=True
+SUMMARY Mapped: known=[Missing], open=False, success=False, result=True
+SUMMARY Recovered: known=[], open=False, success=True, result=True
+SUMMARY SuccessError: known=[], open=False, success=True, result=True
+SUMMARY Open: known=[Missing], open=True, success=True, result=True
+PROBE assignment receiver: known=[After], open=False, result=True, invalid=False; control: known=[After], open=False, result=True, invalid=False
+PASS assignment receiver: runtime=After; local=known=[After], open=False, result=True, invalid=False; external=known=[After], open=False, result=True, invalid=False
+PASS generic pattern: runtime=After; definition=known=[Before, After], open=False, result=True, invalid=False; source call=known=[After], open=False, result=True, invalid=False; metadata=known=[Before, After], open=False, result=True, invalid=False
+PASS null task: local=known=[], open=False, result=False, invalid=False; external=known=[], open=False, result=False, invalid=False
+PASS satellite host accepts producer-generated NullTask summary without AD0001.
+PASS switch code fix preserves interface coverage without CS8510.
+using FlowOnRails;
+public interface IRetryable { }
+public sealed record Missing : Error, IRetryable;
+public sealed record Other : Error;
+public static class SwitchProbe
+{
+    public static string Describe(bool flag)
+    {
+        Error error = flag ? new Missing() : new Other();
+        return error switch { IRetryable => "retry", Other => throw new System.NotImplementedException(), _ => "fallback" };
+    }
+}

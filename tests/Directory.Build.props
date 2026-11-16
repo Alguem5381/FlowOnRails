@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Select the test runtime independently of the libraries' public targets. -->
+    <FlowOnRailsTestTargetFramework Condition="'$(FlowOnRailsTestTargetFramework)' == ''">net10.0</FlowOnRailsTestTargetFramework>
+  </PropertyGroup>
+</Project>

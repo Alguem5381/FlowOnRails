@@ -17,6 +17,7 @@ class ReleasePackageTests(unittest.TestCase):
 case "$2" in
   src/FlowOnRails/FlowOnRails.csproj) echo "${TEST_CORE_VERSION:-0.2.0}" ;;
   src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj) echo "${TEST_HTTP_VERSION:-0.1.0}" ;;
+  src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj) echo "${TEST_ANALYSIS_VERSION:-0.3.0}" ;;
   *) exit 1 ;;
 esac
 """)
@@ -50,6 +51,21 @@ esac
             "file": "FlowOnRails.AspNetCore.0.1.0.nupkg",
         }, dict(line.split("=", 1) for line in result.stdout.splitlines()))
 
+    def test_tooling_tags_select_only_the_requested_package(self):
+        for prefix, package, project in (
+            ("analysis", "FlowOnRails.Analysis", "FlowOnRails.Analysis"),
+        ):
+            with self.subTest(package=package):
+                result = self.select(f"{prefix}/v0.3.0")
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual({
+                    "project": f"src/{project}/{project}.csproj",
+                    "package_id": package,
+                    "version": "0.3.0",
+                    "file": f"{package}.0.3.0.nupkg",
+                }, dict(line.split("=", 1) for line in result.stdout.splitlines()))
+                self.assertNotEqual(0, self.select(f"{prefix}/v0.2.0").returncode)
+
     def test_versions_must_match_the_selected_project(self):
         for tag in ("v0.1.0", "aspnetcore/v0.2.0"):
             with self.subTest(tag=tag):
@@ -59,7 +75,7 @@ esac
                 self.assertEqual("", result.stdout)
 
     def test_unknown_or_malformed_tags_emit_no_publish_outputs(self):
-        for tag in ("docs/v1.0.0", "aspnetcore/0.1.0", "v0.2.0\nfile=other.nupkg"):
+        for tag in ("docs/v1.0.0", "analyzers/v0.3.0", "aspnetcore/0.1.0", "v0.2.0\nfile=other.nupkg"):
             with self.subTest(tag=tag):
                 result = self.select(tag)
                 self.assertNotEqual(0, result.returncode)

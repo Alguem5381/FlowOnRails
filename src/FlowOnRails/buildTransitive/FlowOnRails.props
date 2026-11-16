@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <FlowOnRailsEnableFlowAnalysis Condition="'$(FlowOnRailsEnableFlowAnalysis)' == ''">false</FlowOnRailsEnableFlowAnalysis>
+  </PropertyGroup>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="FlowOnRailsEnableFlowAnalysis" />
+  </ItemGroup>
+</Project>
