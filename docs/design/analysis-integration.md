@@ -18,6 +18,8 @@ mora em `src/FlowOnRails.Analysis/Internal`. Essas classes são internas, mesmo
 quando um projeto amigo consegue acessá-las. O contrato público é a fachada
 `ErrorFlowAnalysis`, `ErrorFlowSummary` e `ErrorFlowCase`, junto aos modelos
 `ErrorFlowLimitation`, `ErrorFlowLimitationCode` e `ErrorFlowSummaryOrigin`.
+Consultas por ponto usam `AnalyzeExpressions`, `ErrorFlowExpressionResult` e
+`ErrorFlowExpressionStatus`.
 
 ## Como um gerador consulta os erros
 
@@ -36,10 +38,26 @@ if (summary.HasUnknownErrors)
 ```
 
 O exemplo é conceitual: `handlerMethod` precisa ser um `IMethodSymbol` cujo retorno
-seja Rail/RailFor/Error, opcionalmente Task/ValueTask. A API ainda não consulta
-retornos arbitrários como `IResult`, nem especializa uma chamada com argumentos
-concretos. Uma função que envolve o handler deve ser identificada pelo gerador
-HTTP; o motor não infere as regras de endpoints do ASP.NET.
+seja Rail/RailFor/Error, opcionalmente Task/ValueTask. Ele também pode representar
+uma função local ou lambda consultada independentemente, com entradas e capturas
+desconhecidas. A API não recebe valores hipotéticos de argumentos do consumidor.
+Uma função que envolve o handler deve ser identificada pelo gerador HTTP; o motor
+não infere as regras de endpoints do ASP.NET.
+
+Para um handler que retorna `IResult`, identificar as expressões Rail/Error que
+chegam à tradução HTTP e passá-las a `AnalyzeExpressions(bodySymbol, expressions,
+cancellationToken)`. O retorno do corpo pode ser arbitrário. A análise interpreta
+o corpo uma vez para coletar os pontos solicitados, preservando a especialização
+de chamadas concretas encontrada no código. Lambdas e funções locais têm corpos
+próprios; não misturar expressões delas com pontos do método que as declara.
+
+Cada ponto tem status Analyzed, Unreachable ou Unsupported. Apenas Analyzed tem
+Summary; os demais não certificam ausência de erros. Os erros são específicos do
+ponto, mas condições e limitações descrevem conservadoramente o corpo inteiro.
+Um ponto não suportado não desliga os demais. Consulte o
+[contrato das expressões](../../src/FlowOnRails.Analysis/README.md#query-expressions-within-a-body)
+para as validações de entrada e a distinção entre erro desconhecido e consulta
+indisponível.
 
 Criar o contexto por compilação, reaproveitá-lo durante aquela execução e passá-lo
 para as consultas; consultas concorrentes são suportadas. `CanAnalyze` verifica

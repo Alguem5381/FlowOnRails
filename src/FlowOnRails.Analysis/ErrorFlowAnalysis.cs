@@ -8,13 +8,13 @@ using Microsoft.CodeAnalysis;
 
 namespace FlowOnRails.Analysis;
 
-/// <summary>Queries method error flow in one immutable Roslyn compilation.</summary>
+/// <summary>Queries method and expression error flow in one immutable Roslyn compilation.</summary>
 /// <remarks>
 /// Reuse an instance within a compilation. Create another when the compilation changes.
 /// Concurrent queries on the same instance are supported.
 /// Queries do not depend on diagnostic severities or the MSBuild analysis opt-in.
 /// </remarks>
-public sealed class ErrorFlowAnalysis
+public sealed partial class ErrorFlowAnalysis
 {
     private readonly LibrarySymbols _symbols;
     private readonly MethodBodyResolver _bodies;
@@ -87,7 +87,8 @@ public sealed class ErrorFlowAnalysis
     /// <remarks>
     /// Uses unknown parameter inputs. Concrete local bodies are interpreted; referenced
     /// assemblies use exported metadata. Interface and unresolved virtual contracts stay open.
-    /// This preview API does not expose contextual call-site argument specialization.
+    /// Local functions and anonymous functions can be queried independently; their captured
+    /// inputs are unknown. This API does not accept caller-supplied argument values.
     /// </remarks>
     /// <exception cref="ArgumentNullException">The method is null.</exception>
     /// <exception cref="ArgumentException">The method belongs to another compilation or has an unsupported return type.</exception>

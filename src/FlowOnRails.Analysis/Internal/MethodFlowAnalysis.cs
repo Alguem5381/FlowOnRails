@@ -23,6 +23,7 @@ internal sealed partial class MethodFlowAnalysis
     private readonly AnalysisSession _analysisSession;
     private readonly IDictionary<IInvocationOperation, MethodFlowResult>? _invocationResults;
     private readonly FlowObservation? _observation;
+    private readonly FlowExpressionObservations? _expressionObservations;
 
     private MethodFlowAnalysis(
         LibrarySymbols librarySymbols,
@@ -32,7 +33,8 @@ internal sealed partial class MethodFlowAnalysis
         AnalysisSession analysisSession,
         TypeSubstitution? types = null,
         IDictionary<IInvocationOperation, MethodFlowResult>? invocationResults = null,
-        FlowObservation? observation = null)
+        FlowObservation? observation = null,
+        FlowExpressionObservations? expressionObservations = null)
     {
         _librarySymbols = librarySymbols;
         _types = types ?? new TypeSubstitution(librarySymbols.Compilation, methodSymbol);
@@ -42,6 +44,7 @@ internal sealed partial class MethodFlowAnalysis
         _analysisSession = analysisSession;
         _invocationResults = invocationResults;
         _observation = observation;
+        _expressionObservations = expressionObservations;
     }
 
     internal static MethodFlowResult Analyze(
@@ -52,10 +55,19 @@ internal sealed partial class MethodFlowAnalysis
         CancellationToken cancellationToken,
         IDictionary<IInvocationOperation, MethodFlowResult>? invocationResults = null,
         FlowObservation? observation = null,
-        FlowValue[]? initialArguments = null)
+        FlowValue[]? initialArguments = null,
+        FlowExpressionObservations? expressionObservations = null)
     {
         var analysisSession = new AnalysisSession(cancellationToken);
         var entryState = new FlowState();
+
+        if (methodSymbol.MethodKind is MethodKind.LocalFunction or MethodKind.AnonymousFunction
+            && EnumerateGraphOperations(controlFlowGraph).Select(GetSlot).Any(slot =>
+                slot?.Symbol is ILocalSymbol or IParameterSymbol
+                && !SymbolEqualityComparer.Default.Equals(slot.Value.Symbol!.ContainingSymbol, methodSymbol.OriginalDefinition)))
+            analysisSession.Limitations.Add(new ErrorFlowLimitation(
+                ErrorFlowLimitationCode.CapturedInputUnknown,
+                "Captured inputs are unknown when a nested function is analyzed without a calling context"));
 
         foreach (var parameter in methodSymbol.Parameters)
             entryState.Write(new Slot(parameter),
@@ -82,7 +94,8 @@ internal sealed partial class MethodFlowAnalysis
             rootApproximation.Active = true;
             methodAnalysis = new MethodFlowAnalysis(
                 librarySymbols, methodBodies, controlFlowGraph, methodSymbol, analysisSession,
-                invocationResults: invocationResults, observation: observation);
+                invocationResults: invocationResults, observation: observation,
+                expressionObservations: expressionObservations);
             analysisResult = methodAnalysis.AnalyzeMethodReturn(entryState.Copy()) ?? FlowValue.Bottom;
             rootApproximation.Active = false;
             analysisSession.UpdateApproximation(rootApproximation, analysisResult);
@@ -198,6 +211,10 @@ internal sealed partial class MethodFlowAnalysis
     private FlowValue EvaluateInvocation(IInvocationOperation invocation, FlowState state)
     {
         var receiver = invocation.Instance is { } instance ? EvaluateOperation(instance, state) : FlowValue.Other;
+
+        if (!state.Reachable)
+            return FlowValue.Bottom;
+
         var arguments = new FlowValue[invocation.TargetMethod.Parameters.Length];
         var referenceArguments = new Dictionary<int, ImmutableArray<Slot>>();
 
@@ -210,6 +227,9 @@ internal sealed partial class MethodFlowAnalysis
             var argumentValue = argument.Parameter?.RefKind == RefKind.Out
                 ? UnknownValue(argument.Value.Type)
                 : EvaluateOperation(argument.Value, state);
+
+            if (!state.Reachable)
+                return FlowValue.Bottom;
 
             if (argument.Parameter is { } parameter && parameter.Ordinal < arguments.Length)
                 arguments[parameter.Ordinal] = argumentValue;

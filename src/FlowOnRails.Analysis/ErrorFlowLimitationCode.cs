@@ -51,5 +51,7 @@ public enum ErrorFlowLimitationCode
     /// <summary>Deconstruction destinations require conservative values.</summary>
     DeconstructionUntracked = 22,
     /// <summary>A reference alias points outside tracked storage.</summary>
-    ReferenceAliasUntracked = 23
+    ReferenceAliasUntracked = 23,
+    /// <summary>A nested function was queried independently without values for its captures.</summary>
+    CapturedInputUnknown = 24
 }

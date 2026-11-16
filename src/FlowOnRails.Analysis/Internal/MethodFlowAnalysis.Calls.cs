@@ -88,6 +88,9 @@ internal sealed partial class MethodFlowAnalysis
         ControlFlowGraph? graph = null,
         TypeSubstitution? types = null)
     {
+        if (!state.Reachable)
+            return FlowValue.Bottom;
+
         if (method.ContainingType.TypeKind == TypeKind.Interface || method.IsAbstract
             || isVirtual && !method.IsSealed && !method.ContainingType.IsSealed)
         {

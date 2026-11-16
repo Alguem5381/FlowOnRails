@@ -58,6 +58,76 @@ compilation, exported metadata in referenced assemblies, and open ResultsWith
 contracts for interfaces or unresolved virtual dispatch. A missing body or missing
 metadata gives an explicitly open summary, never an empty certificate.
 
+Local functions and lambdas can also be passed to `AnalyzeMethod` or
+`TryAnalyzeMethod` using their Roslyn `IMethodSymbol`. These are independent
+entry points: parameters and captured inputs start unknown. When captured inputs
+are present, `CapturedInputUnknown` explains the missing calling context. This
+does not change how known calls within an analyzed body specialize their arguments
+and supported captured state.
+
+## Query expressions within a body
+
+Use `AnalyzeExpressions` when the value of interest is passed to another API,
+recovered later, or lives in a method returning an unrelated type such as `IResult`.
+
+```csharp
+var results = analysis.AnalyzeExpressions(
+    bodySymbol, valueExpressions, cancellationToken);
+
+foreach (var result in results)
+{
+    if (result.Status != ErrorFlowExpressionStatus.Analyzed)
+        continue;
+
+    var summary = result.Summary!;
+
+    foreach (var errorType in summary.KnownErrorTypes)
+        RegisterKnownError(errorType);
+
+    if (summary.HasUnknownErrors)
+        PreserveUnknownErrorFallback();
+}
+```
+
+`bodySymbol` is a source `IMethodSymbol` for a method, constructor, local function
+or lambda in the compilation. `valueExpressions` is an
+`IEnumerable<ExpressionSyntax>` containing expressions from that same executable
+body. A nested lambda or local function is a separate body, even when declared
+inside the supplied method. Use its own symbol to query expressions inside it.
+For a lambda, `IAnonymousFunctionOperation.Symbol` provides that symbol.
+
+The body's return type is unrestricted. A point's supported value type is Rail,
+RailFor or Error, optionally wrapped in Task/ValueTask. Source bodies of virtual
+methods are interpreted as those implementations; this does not close their
+dispatch contracts when called elsewhere or queried with `AnalyzeMethod`.
+
+One body analysis collects all requested points. Results preserve input order and
+duplicates. Each value joins the possibilities observed at that point across
+branches and repeated loop visits. For example, querying a value before recovery
+can report failures while querying the recovered value reports success. Calls at
+these points use supported argument specialization and referenced-assembly metadata.
+
+| Status | Contract |
+| --- | --- |
+| `Analyzed` | `Summary` is non-null and conservative. Unknown alternatives and no normal result remain possible states within that summary. |
+| `Unreachable` | Supported flow did not evaluate the expression; `Summary` is null. |
+| `Unsupported` | The type, body or evaluation could not be observed; `Summary` is null and `LimitationDetails` explains why. |
+
+A point with an unsupported type does not disable supported points. If an
+unobserved point cannot be established as unreachable because the body has
+limitations, it is `Unsupported`. Exhausting the shared analysis budget also
+opens the summaries of observed points instead of presenting a partial traversal
+as exhaustive. Write-only destinations are unsupported value queries.
+
+Error alternatives are specific to the requested point. Conditions and limitations
+conservatively describe the containing body and can mention other operations;
+they are not precise dependency traces for that individual value.
+
+Null/foreign symbols, null/foreign expressions and expressions belonging to another
+body throw argument exceptions. Cancellation propagates. An empty sequence returns
+an empty result. The API does not execute application code or accept hypothetical
+input values supplied by the tool.
+
 ## Result contract
 
 | Member | Meaning |

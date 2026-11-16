@@ -17,6 +17,9 @@ internal sealed partial class MethodFlowAnalysis
     // observer, so identical spans in another body cannot contaminate this value.
     private FlowValue EvaluateOperation(IOperation operation, FlowState state)
     {
+        if (!state.Reachable)
+            return FlowValue.Bottom;
+
         var mayThrow = _exceptionBlock is not null && MayThrow(operation);
 
         if (mayThrow)
@@ -24,7 +27,7 @@ internal sealed partial class MethodFlowAnalysis
 
         var value = EvaluateOperationCore(operation, state);
 
-        if (_analysisSession.HasMutableCallbacks && HasUnmodeledEffects(operation))
+        if (state.Reachable && _analysisSession.HasMutableCallbacks && HasUnmodeledEffects(operation))
         {
             InvalidateTrackedValues(state);
             value = UnknownValue(operation.Type);
@@ -38,11 +41,16 @@ internal sealed partial class MethodFlowAnalysis
         if (mayThrow)
             ObservePossibleException(state);
 
+        if (!state.Reachable)
+            value = FlowValue.Bottom;
+
         if (_observation is { } observation
             && operation.Syntax.SyntaxTree == observation.Expression.SyntaxTree
             && operation.Syntax.Span == observation.Expression.Span
             && value.Kind == ValueKind.Error)
             observation.Value = observation.Value.Join(value);
+
+        _expressionObservations?.Observe(operation, value, _librarySymbols);
 
         return value;
     }
@@ -214,6 +222,9 @@ internal sealed partial class MethodFlowAnalysis
                 foreach (var argument in creation.Arguments)
                 {
                     var argumentValue = EvaluateOperation(argument.Value, state);
+
+                    if (!state.Reachable)
+                        return FlowValue.Bottom;
 
                     if (argument.Parameter?.Ordinal == 0)
                         firstArgument = argumentValue;
