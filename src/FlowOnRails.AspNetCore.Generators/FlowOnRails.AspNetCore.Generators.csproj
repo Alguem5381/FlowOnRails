@@ -9,6 +9,7 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../FlowOnRails.Analysis/FlowOnRails.Analysis.csproj" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
   </ItemGroup>

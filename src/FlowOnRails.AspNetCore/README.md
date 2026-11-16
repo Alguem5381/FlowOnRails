@@ -14,8 +14,8 @@ application's API layer and out of the domain.
 dotnet add package FlowOnRails.AspNetCore --version 0.1.0
 ```
 
-The package depends on `FlowOnRails` and includes the generator as a C# analyzer.
-No separate generator package or runtime dependency on Roslyn is required. Use the
+The package depends on `FlowOnRails` and includes the generator and HTTP mapping analyzer.
+No separate tooling package or runtime dependency on Roslyn is required. Use the
 .NET 10 SDK (Roslyn 5 / C# 14) or a compatible newer compiler.
 
 ## Configure the integration
@@ -201,12 +201,14 @@ and is diagnosed rather than producing broken generated code.
 
 ## Develop from source
 
-For development directly from source, reference both projects:
+For development directly from source, reference the runtime and both tooling projects:
 
 ```xml
 <ItemGroup>
   <ProjectReference Include="path/to/FlowOnRails.AspNetCore.csproj" />
   <ProjectReference Include="path/to/FlowOnRails.AspNetCore.Generators.csproj"
+                    OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  <ProjectReference Include="path/to/FlowOnRails.Analysis.csproj"
                     OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 </ItemGroup>
 ```
@@ -246,6 +248,8 @@ and [Program](https://github.com/Alguem5381/FlowOnRails/blob/main/samples/FlowOn
 | FORHTTP006 | Error | Domain assembly not selected / invalid assembly marker |
 | FORHTTP007 | Warning | Reserved automatic root property omitted |
 | FORHTTP008 | Error | Automatic property cannot be boxed into extensions |
+| FORHTTP009 | Warning | Known endpoint error requires a specific translation but has no authorized map |
+| FORHTTP010 | Info | Endpoint mapping verification is unavailable or incomplete |
 
 Duplicate detection uses C# identity conversions rather than type spelling. Maps
 for `SomeError<dynamic>` and `SomeError<object>` conflict, as do maps differing
@@ -255,3 +259,74 @@ such as `SomeError<int>` and `SomeError<int?>` remain separate contracts.
 Configuration-body conflicts, such as manually configuring extensions on a map
 marked automatic, are rejected during catalog registration. Arbitrary C# callback
 bodies are not executed or fully interpreted by the generator.
+
+## Check endpoint mappings
+
+The HTTP analyzer checks known exact errors in the Rail value supplied to
+`ToHttpResult` or `ToActionResult` inside an endpoint body:
+
+```csharp
+app.MapGet("/users/{id:int}", (int id, UserService service) =>
+    service.Find(id).ToHttpResult(Results.Ok));
+
+// In a controller action:
+public ActionResult<UserDto> Get(int id) =>
+    service.Find(id).ToActionResult(Ok);
+```
+
+A warning means that a known error will use the generic problem despite a policy
+selecting specific translation. Add its exact map for `TranslateEachType`, or map
+an authorized ancestor for `UseNearestAncestorMapping`. Selecting
+`UseGenericProblem` is also valid when the generic response is intentional.
+Unconfigured errors use the generic response and do not need a specific map.
+
+The analyzer reads direct visibility callbacks, including global and exact
+controller rules, bounded tree blocks, and endpoint/route-group overrides. It
+checks registered catalogs rather than assuming every declared map is installed.
+Direct manual translation registrations are also supported. A controller scope
+that cannot be determined does not block checks for other controllers.
+The first version resolves generated catalogs in the current compilation;
+catalog registration from another assembly is treated as unknown. Multiple MVC
+route registrations are also treated as unknown because their endpoint scopes
+may differ. Inherited actions are reported as unavailable when their concrete
+controller context cannot be established. Controllers may inherit `ControllerBase`
+or use the standard controller name/attribute conventions.
+
+Endpoint bodies may be inline anonymous functions, method groups or controller
+actions. The analyzer follows local Rail variables, supported transformations,
+argument forwarding and awaited Task/ValueTask values before conversion. Each
+conversion input is queried in its containing body; several inputs share one
+analysis. A recovered error does not require a map at a later conversion, and
+unreachable conversions do not require maps.
+
+Conversions must appear in an endpoint return, including branch and conditional
+returns. A conversion hidden in an HTTP-returning helper or stored as an HTTP
+result for later use is reported as unavailable. Unused nested functions are not
+endpoint bodies. Parameters and captured values start unknown, and supported calls
+within a body retain the base engine's argument specialization.
+
+Conditional configuration, configuration helpers and unresolved escapes produce
+`FORHTTP010` for affected contexts. Handler branches and transformations are
+interpreted by the base engine within its supported model. The analyzer does not
+execute application configuration or infer that an unsupported expression has no
+errors. Unknown or conditional error cases also produce an incomplete-flow notice.
+
+Error flow is approximate. Exact known cases can be checked even when other errors
+remain unknown; an open family's root is not treated as a concrete returned error.
+Keep the generic fallback even when no warnings are reported. Uninitialized Rails
+remain programming errors rather than HTTP domain failures.
+
+Explicit queries do not require enabling the base analyzer. For handlers in a
+referenced assembly, enable `FlowOnRailsEnableFlowAnalysis` in the producer to
+export summaries. Without summaries, the consumer cannot recover the method body.
+
+Configure the HTTP diagnostics independently through normal analyzer settings:
+
+```ini
+[*.cs]
+dotnet_diagnostic.FORHTTP009.severity = warning
+dotnet_diagnostic.FORHTTP010.severity = suggestion
+```
+
+See [the design notes](../../docs/design/aspnetcore-mapping-analysis.md) for scope
+resolution and uncertainty handling.

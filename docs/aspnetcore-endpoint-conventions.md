@@ -88,8 +88,8 @@ var decision = policy.ResolveForRequest(error, httpContext);
 `ErrorPolicy` usa as regras do endpoint, dos grupos, do controller quando houver,
 e do escopo global. `ExposureDecision` devolve o comportamento e os contratos
 permitidos para tradução. Nenhuma dessas operações escreve uma resposta HTTP.
-A futura integração de resultados poderá consumir essa decisão para gerar
-ProblemDetails.
+A integração de resultados consome essa decisão para gerar ProblemDetails;
+veja o [guia HTTP atual](../src/FlowOnRails.AspNetCore/README.md).
 
 ## Onde começar a leitura
 

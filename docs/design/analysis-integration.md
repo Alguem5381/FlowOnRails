@@ -1,8 +1,10 @@
 # Integração da análise nos projetos satélites
 
-Este é o ponto de partida para a próxima versão de `FlowOnRails.AspNetCore`.
-O pacote HTTP ainda não foi adaptado nesta etapa. A auditoria e o acompanhamento das
-correções estão em `docs/reviews`; não tratar os resultados como prova de exaustividade.
+`FlowOnRails.AspNetCore` consome esta API para verificar mapas de erros conhecidos
+por endpoint. O recorte e as limitações estão em
+[verificação de mapeamentos HTTP](aspnetcore-mapping-analysis.md).
+A auditoria e o acompanhamento das correções do motor estão em `docs/reviews`;
+não tratar os resultados como prova de exaustividade.
 
 ## Fronteiras dos componentes
 
@@ -10,7 +12,7 @@ correções estão em `docs/reviews`; não tratar os resultados como prova de ex
 | --- | --- | --- |
 | FlowOnRails | Rail, RailFor, Error, atributos e ferramentas de análise opcionais | Sim |
 | FlowOnRails.Analysis | API Roslyn, motor e leitor dos resumos | Não; ferramenta de compilação |
-| FlowOnRails.AspNetCore | Tradução HTTP e seu gerador | Sim para o adaptador; gerador roda na compilação |
+| FlowOnRails.AspNetCore | Tradução HTTP, gerador e analisador de mapeamentos | Sim para o adaptador; ferramentas rodam na compilação |
 
 O pacote base inclui as DLLs de `FlowOnRails.Analyzers` e `FlowOnRails.CodeFixes`
 como ferramentas de compilação, desativadas por padrão. O motor
@@ -108,7 +110,7 @@ Tipos encontrados pelo motor também não estabelecem automaticamente sua
 visibilidade HTTP, o status, a exposição da mensagem ou a autorização de uma camada.
 Essas decisões continuam pertencendo ao contrato e à política do satélite.
 
-## Empacotamento do gerador HTTP futuro
+## Empacotamento das ferramentas HTTP
 
 No projeto do gerador, referenciar `FlowOnRails.Analysis` com `PrivateAssets="all"`.
 No NuGet do satélite, colocar a DLL da análise junto à DLL do gerador em
@@ -133,10 +135,10 @@ A origem da consulta é resolvida no consumidor e não copiada do produtor.
 A versão do payload é independente da versão NuGet.
 Não persistir ou analisar esse formato fora da biblioteca de análise.
 
-## Escopo da próxima tarefa ASP.NET
+## Pontos de integração ASP.NET
 
-1. Identificar onde o gerador HTTP encontra o símbolo do handler Rail.
-2. Consultar a API e combinar os tipos com a visibilidade/mapeamentos do contrato.
+1. Identificar o corpo do endpoint e as expressões Rail fornecidas às conversões HTTP.
+2. Consultar `AnalyzeExpressions` por corpo e combinar cada resultado com a visibilidade e os mapeamentos da rota.
 3. Manter tratamento genérico para erros desconhecidos e não inicialização.
 4. Testar implementações concretas, interfaces, Task/ValueTask e assemblies separados.
 5. Empacotar a dependência do gerador e testar um consumidor instalado por NuGet.

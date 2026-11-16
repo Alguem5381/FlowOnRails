@@ -24,7 +24,7 @@
     <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <Target Name="IncludeProblemGenerator">
-    <MSBuild Projects="../FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj"
+    <MSBuild Projects="../FlowOnRails.AspNetCore.Generators/FlowOnRails.AspNetCore.Generators.csproj;../FlowOnRails.Analysis/FlowOnRails.Analysis.csproj"
              Targets="GetTargetPath" Properties="Configuration=$(Configuration)" RemoveProperties="TargetFramework">
       <Output TaskParameter="TargetOutputs" ItemName="_ProblemGenerator" />
     </MSBuild>
