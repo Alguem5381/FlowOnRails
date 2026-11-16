@@ -1,14 +1,15 @@
 # Publicação no NuGet
 
-O repositório prepara três pacotes independentes. A versão 0.3.0 inclui o
-analisador no pacote base, desativado por padrão.
+O repositório prepara três pacotes independentes. O analisador do pacote base
+permanece desativado por padrão. A versão 0.4.0 adiciona consultas de fluxo por
+expressão e por funções locais ou anônimas.
 A auditoria e o acompanhamento das correções estão em `docs/reviews`.
 
 | Pacote | Projeto | Versão alvo | Formato da tag |
 |---|---|---|---|
-| `FlowOnRails` | `src/FlowOnRails/FlowOnRails.csproj` | `0.3.0` | `v<versão>` ou `<versão>` |
-| `FlowOnRails.Analysis` | `src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj` | `0.3.0` | `analysis/v<versão>` |
-| `FlowOnRails.AspNetCore` | `src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj` | `0.1.0` | `aspnetcore/v<versão>` |
+| `FlowOnRails` | `src/FlowOnRails/FlowOnRails.csproj` | `0.4.0` | `v<versão>` ou `<versão>` |
+| `FlowOnRails.Analysis` | `src/FlowOnRails.Analysis/FlowOnRails.Analysis.csproj` | `0.4.0` | `analysis/v<versão>` |
+| `FlowOnRails.AspNetCore` | `src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj` | `0.2.0` | `aspnetcore/v<versão>` |
 
 O pacote base inclui os novos atributos de contrato e metadados. O pacote Analysis
 é uma API de desenvolvimento que depende de Roslyn e não da biblioteca de execução.
@@ -16,9 +17,10 @@ O pacote base inclui motor, analisador com gerador e correções de editor em
 `analyzers/dotnet/cs`, sem dependências NuGet de compilação ou execução.
 A análise é ativada com `FlowOnRailsEnableFlowAnalysis=true`.
 
-O pacote ASP.NET atual continua incluindo seu próprio gerador e dependendo da
-base. Sua próxima versão ainda será adaptada à API de análise; essa adaptação não
-foi incluída nesta etapa. Os projetos internos do analisador, das correções e do
+O pacote ASP.NET inclui seu gerador, o analisador de mapeamentos HTTP e a DLL da
+API de análise em `analyzers/dotnet/cs`. Sua única dependência NuGet de execução
+continua sendo a base. A API embutida deve ter a mesma versão distribuída pelas
+ferramentas da base. Os projetos internos do analisador, das correções e do
 gerador ASP.NET não são publicados separadamente.
 
 ## O que dispara cada fluxo
@@ -31,8 +33,8 @@ gerador ASP.NET não são publicados separadamente.
 | Release publicada no GitHub | Validação no próprio CD | Publica somente o pacote selecionado pela tag |
 
 O CD faz checkout da tag e executa `scripts/select-release-package.sh` antes da
-autenticação. Por exemplo, `v0.3.0` seleciona exclusivamente
-`FlowOnRails.0.3.0.nupkg`. A versão da tag deve corresponder exatamente
+autenticação. Por exemplo, `v0.4.0` seleciona exclusivamente
+`FlowOnRails.0.4.0.nupkg`. A versão da tag deve corresponder exatamente
 à versão configurada no projeto, inclusive em pré-releases. Tags desconhecidas e
 versões incompatíveis falham. O nome da release não seleciona o pacote.
 
@@ -57,8 +59,10 @@ O verificador executa estas etapas:
 - Confere as DLLs de compilação e a configuração de ativação do analisador.
 - Copia os consumidores de `tests/packaging` para fora do repositório e restaura
   em um cache novo, usando apenas `PackageReference`.
-- Executa sucesso/falha da base e respostas HTTP/MVC do satélite; um cenário
-  inválido deve produzir `FORHTTP004` pelo gerador empacotado.
+- Executa sucesso/falha da base e respostas HTTP/MVC do satélite; status inválido
+  deve produzir `FORHTTP004` e um erro visível sem mapa deve produzir `FORHTTP009`
+  pelas ferramentas empacotadas. Repete a verificação HTTP com um handler externo
+  cujo produtor exporta o resumo e com uma resposta genérica intencional.
 - Verifica exportação e leitura de resumos entre dois projetos, FORFLOW001/002/003
   com ativação explícita, além da ausência de diagnósticos e metadados no modo padrão.
 - Usa a API pública em uma compilação Roslyn, incluindo um contrato aberto.
@@ -69,7 +73,7 @@ O verificador executa estas etapas:
 
 Para releases do ASP.NET, uma segunda execução com `--published-base`
 restaura a base exclusivamente do NuGet público. Assim, depender de uma versão
-que só existe localmente impede a publicação antes da autenticação. A base 0.3.0
+que só existe localmente impede a publicação antes da autenticação. A base 0.4.0
 precisa ser publicada primeiro. A API Analysis pode ser publicada independentemente;
 ela é destinada aos desenvolvedores dos satélites.
 
@@ -86,8 +90,8 @@ dotnet pack src/FlowOnRails.AspNetCore/FlowOnRails.AspNetCore.csproj -c Release 
 python3 scripts/verify-packages.py ./artifacts/packages
 python3 scripts/verify-packages.py ./artifacts/packages --framework net10.0 --framework net11.0
 python3 scripts/verify-packages.py ./artifacts/packages --framework net11.0 --runtime-async
-bash scripts/select-release-package.sh v0.3.0
-# Depois que a base 0.3.0 estiver publicada:
+bash scripts/select-release-package.sh v0.4.0
+# Depois que a base 0.4.0 estiver publicada:
 python3 scripts/verify-packages.py ./artifacts/packages --published-base
 ```
 
@@ -123,8 +127,8 @@ verificou a política externa da conta NuGet. Confira seu escopo antes da releas
 1. Resolver os achados, revisar API pública, documentação e versões finais.
 2. Enviar os commits revisados, obter CI aprovado e integrar à `main`.
 3. Conferir o escopo da política NuGet e a disponibilidade das versões.
-4. Publicar a base com a tag `v0.3.0` e conferir sua disponibilidade no NuGet.
-5. Publicar a API separadamente com `analysis/v0.3.0`, quando desejado.
+4. Publicar a base com a tag `v0.4.0` e conferir sua disponibilidade no NuGet.
+5. Publicar a API separadamente com `analysis/v0.4.0`, quando desejado.
 6. Publicar o satélite separadamente, quando sua própria versão estiver revisada.
 
 Cada publicação exige sua própria release. O envio de uma versão já existente

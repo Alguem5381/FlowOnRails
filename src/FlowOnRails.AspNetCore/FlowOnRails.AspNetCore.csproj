@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>FlowOnRails.AspNetCore</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>alguem5381</Authors>
     <Description>ASP.NET Core integration for FlowOnRails with scoped error visibility, generated ProblemDetails mappings and native HTTP/MVC result adapters.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

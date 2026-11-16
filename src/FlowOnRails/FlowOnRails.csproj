@@ -8,7 +8,7 @@
     
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);IncludeFlowTools</TargetsForTfmSpecificContentInPackage>
     <PackageId>FlowOnRails</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Authors>alguem5381</Authors>
     <Description>A modern, lightweight, and compiler-safe library for Railway Oriented Programming in C#.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
