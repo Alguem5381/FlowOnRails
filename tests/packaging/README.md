@@ -29,9 +29,9 @@ for the combined verification. See [compatibility](../../docs/compatibility.md).
 | Fixture | References | Verification |
 |---|---|---|
 | CoreConsumer | Base package | Successful values and original failures |
-| AspNetCoreConsumer | ASP.NET package | Transitive base, generated registration, seven HTTP/MVC responses and FORHTTP004 for invalid status |
+| AspNetCoreConsumer | ASP.NET package, base package in a producer | Transitive base, generated registration, seven HTTP/MVC responses, FORHTTP004 for invalid status, FORHTTP009 for local/external unmapped errors and acceptance of intentional generic responses |
 | AnalyzerConsumer | Base package, in both producer and consumer projects | Explicit opt-in, exported reference-assembly summaries, FORFLOW001/002/003, default off and explicit false |
-| AnalysisConsumer | Analysis API and base packages | Public API with concrete methods and open interface contracts |
+| AnalysisConsumer | Analysis API and base packages | Method and expression queries, recovery, anonymous functions and open interface contracts |
 
 Application fixtures must not receive Roslyn or the analysis engine as runtime
 dependencies. The API fixture is a development tool and deliberately uses Roslyn.

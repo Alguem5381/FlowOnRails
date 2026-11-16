@@ -24,6 +24,17 @@ app.MapGet("/hidden", () => Rail.Fail(new Missing(42, null)).ToHttpResult(() => 
     .WithErrorVisibility(scope => scope.ForTree<Error>().UseGenericProblem());
 app.MapGet("/empty", () => Rail.Ok().ToHttpResult(Results.NoContent));
 
+#if MISSING_HTTP_MAP
+app.MapGet("/unmapped", () => PackageHandlers.ReadUnmapped().ToHttpResult(Results.Ok));
+#endif
+#if GENERIC_HTTP_MAP
+app.MapGet("/generic", () => PackageHandlers.ReadUnmapped().ToHttpResult(Results.Ok))
+    .WithErrorVisibility(scope => scope.For<Unmapped>().UseGenericProblem());
+#endif
+#if EXTERNAL_HTTP_MAP
+app.MapGet("/external", () => HttpProducer.Handlers.Read().ToHttpResult(() => Results.Ok()));
+#endif
+
 try
 {
     await app.StartAsync();
@@ -99,6 +110,13 @@ public sealed class Payload
 
 public sealed record Missing(int Id, string? Reason) : Error;
 public sealed record Invalid(int Id) : Error;
+
+public sealed record Unmapped : Error;
+
+public static class PackageHandlers
+{
+    public static RailFor<Payload> ReadUnmapped() => Rail.Fail<Payload>(new Unmapped());
+}
 
 public static partial class PackageProblems
 {

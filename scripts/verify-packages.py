@@ -17,6 +17,7 @@ def require(condition, message):
 
 def inspect_packages(directory):
     versions = {}
+    analysis_assemblies = {}
 
     for path in sorted(directory.glob("*.nupkg")):
         with zipfile.ZipFile(path) as archive:
@@ -48,14 +49,21 @@ def inspect_packages(directory):
                 require(dependencies == {"Microsoft.CodeAnalysis.CSharp"}, "The tooling API must declare its Roslyn dependency.")
             elif package == "FlowOnRails.AspNetCore":
                 expected_dlls.add("analyzers/dotnet/cs/FlowOnRails.AspNetCore.Generators.dll")
+                expected_dlls.add("analyzers/dotnet/cs/FlowOnRails.Analysis.dll")
                 require(dependencies == {"FlowOnRails"}, "The satellite must depend only on the base package.")
                 frameworks = {item.attrib["name"] for item in metadata.findall(".//{*}frameworkReference")}
                 require("Microsoft.AspNetCore.App" in frameworks, "The ASP.NET Core framework reference is missing.")
 
             require(dlls == expected_dlls, f"Unexpected assemblies in {path.name}: {dlls}.")
+            analysis_path = ("lib/netstandard2.0/FlowOnRails.Analysis.dll" if package == "FlowOnRails.Analysis"
+                             else "analyzers/dotnet/cs/FlowOnRails.Analysis.dll")
+            analysis_assemblies[package] = archive.read(analysis_path)
             print(f"Validated contents of {path.name}.", flush=True)
 
     require(set(versions) == {"FlowOnRails", "FlowOnRails.AspNetCore", "FlowOnRails.Analysis"}, "Pack all three projects before verification.")
+
+    require(len(set(analysis_assemblies.values())) == 1,
+            "All three packages must ship the same Analysis assembly to avoid analyzer loader conflicts.")
 
     return versions
 
@@ -162,12 +170,34 @@ def verify_consumer(root, scratch, fixture, version_property, version, config, b
         print("Packaged analysis: explicit opt-in, default off and explicit false passed.", flush=True)
 
     if fixture == "AspNetCoreConsumer":
+        generic = subprocess.run([*build, "-p:DefineConstants=GENERIC_HTTP_MAP"], cwd=scratch,
+                                 capture_output=True, text=True, timeout=180)
+        output = generic.stdout + generic.stderr
+        require(generic.returncode == 0 and "FORHTTP009" not in output,
+                f"The packaged analyzer rejected an intentional generic response.\n{output}")
+
+        missing = subprocess.run([*build, "-p:DefineConstants=MISSING_HTTP_MAP"], cwd=scratch,
+                                 capture_output=True, text=True, timeout=180)
+        output = missing.stdout + missing.stderr
+        require(missing.returncode != 0 and "FORHTTP009" in output,
+                f"The packaged analyzer did not diagnose a missing HTTP mapping.\n{output}")
+        require(not any(code in output for code in ("AD0001", "CS8032", "CS8784", "CS8785", "CS9057")),
+                f"The packaged HTTP analyzer failed to load or execute.\n{output}")
+
+        external = subprocess.run([*build, "-p:DefineConstants=EXTERNAL_HTTP_MAP"], cwd=scratch,
+                                  capture_output=True, text=True, timeout=180)
+        output = external.stdout + external.stderr
+        require(external.returncode != 0 and "FORHTTP009" in output and "ProducerUnmapped" in output,
+                f"The packaged HTTP analyzer did not consume the producer's summary.\n{output}")
+        require(not any(code in output for code in ("AD0001", "CS8032", "CS8784", "CS8785", "CS9057")),
+                f"The packaged HTTP analyzer failed for an external handler.\n{output}")
+
         invalid = subprocess.run([*build, "-p:DefineConstants=INVALID_STATUS"], cwd=scratch,
                                  capture_output=True, text=True, timeout=180)
         output = invalid.stdout + invalid.stderr
         require(invalid.returncode != 0 and "FORHTTP004" in output,
                 f"The packaged generator did not diagnose an invalid status.\n{output}")
-        print("Packaged generator: FORHTTP004 diagnostic passed.", flush=True)
+        print("Packaged HTTP tools: FORHTTP004 and FORHTTP009 diagnostics passed.", flush=True)
 
 
 def main():

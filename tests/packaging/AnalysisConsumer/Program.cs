@@ -2,12 +2,26 @@ using FlowOnRails;
 using FlowOnRails.Analysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 const string source = """
+    using System;
     using FlowOnRails;
     public sealed record Missing : Error;
     public interface IReader { [ResultsWith<Missing>] RailFor<int> Read(); }
     public sealed class Reader : IReader { public RailFor<int> Read() => new Missing(); }
+    public static class Endpoint
+    {
+        public static string Run()
+        {
+            var value = new Reader().Read();
+            var recovered = value.Recover(error => 1);
+            return "response";
+        }
+
+        public static void Register() { Func<RailFor<int>> handler = () => new Missing(); }
+    }
     """;
 var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
     .Append(typeof(Rail).Assembly.Location).Distinct()
@@ -32,6 +46,26 @@ if (result.HasUnknownErrors || result.KnownErrorTypes.Single().Name != "Missing"
     || contractResult.Origin != ErrorFlowSummaryOrigin.OpenContract
     || contractResult.LimitationDetails.Single().Code != ErrorFlowLimitationCode.OpenDispatch)
     throw new InvalidOperationException("The packaged public analysis API returned an unexpected summary.");
+
+var endpoint = compilation.GetTypeByMetadataName("Endpoint")!.GetMembers("Run").OfType<IMethodSymbol>().Single();
+var root = compilation.SyntaxTrees.Single().GetRoot();
+var points = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
+    .Where(invocation => invocation.ToString() is "new Reader().Read()" or "value.Recover(error => 1)").ToArray();
+var pointResults = analysis.AnalyzeExpressions(endpoint, points);
+
+if (pointResults.Length != 2
+    || pointResults.Any(point => point.Status != ErrorFlowExpressionStatus.Analyzed)
+    || pointResults[0].Summary!.KnownErrorTypes.Single().Name != "Missing"
+    || pointResults[1].Summary!.KnownErrorTypes.Length != 0
+    || !pointResults[1].Summary!.MaySucceed)
+    throw new InvalidOperationException("The packaged expression API must distinguish failures before recovery from success after recovery.");
+
+var lambda = root.DescendantNodes().OfType<LambdaExpressionSyntax>().Single(node => node.Body is ObjectCreationExpressionSyntax);
+var lambdaOperation = (IAnonymousFunctionOperation)compilation.GetSemanticModel(lambda.SyntaxTree).GetOperation(lambda)!;
+var lambdaSummary = analysis.AnalyzeMethod(lambdaOperation.Symbol);
+
+if (lambdaSummary.HasUnknownErrors || lambdaSummary.KnownErrorTypes.Single().Name != "Missing")
+    throw new InvalidOperationException("The packaged API must analyze a registered lambda as an independent function.");
 
 if (typeof(ErrorFlowAnalysis).Assembly.GetReferencedAssemblies().Any(assembly =>
         assembly.Name == "FlowOnRails" || assembly.Name!.Contains("Workspaces")))

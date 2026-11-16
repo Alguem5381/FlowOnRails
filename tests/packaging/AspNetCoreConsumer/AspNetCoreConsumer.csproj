@@ -9,5 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FlowOnRails.AspNetCore" Version="$(FlowOnRailsAspNetCoreVersion)" />
+    <ProjectReference Include="Producer/Producer.csproj" />
+    <Compile Remove="Producer/**/*.cs" />
   </ItemGroup>
 </Project>
